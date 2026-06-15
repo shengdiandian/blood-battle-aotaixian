@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mountain-900: #0a0e17;
+  --color-mountain-800: #111827;
+  --color-mountain-700: #1e293b;
+  --color-mountain-600: #334155;
+  --color-mountain-500: #475569;
+  --color-mountain-400: #64748b;
+  --color-mountain-300: #94a3b8;
+  --color-mountain-200: #cbd5e1;
+  --color-mountain-100: #e2e8f0;
+  --color-ice-500: #38bdf8;
+  --color-ice-400: #7dd3fc;
+  --color-danger-500: #ef4444;
+  --color-danger-400: #f87171;
+  --color-warning-500: #f59e0b;
+  --color-warning-400: #fbbf24;
+  --color-success-500: #22c55e;
+  --color-success-400: #4ade80;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--color-mountain-900);
+  color: var(--color-mountain-200);
+  font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Leaflet map overrides */
+.leaflet-container {
+  background: var(--color-mountain-800) !important;
+  border-radius: 8px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-mountain-800);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-mountain-600);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-mountain-500);
+}

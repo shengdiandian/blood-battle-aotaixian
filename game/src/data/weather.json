@@ -1,0 +1,86 @@
+[
+  {
+    "id": "weather_blizzard",
+    "name": "暴风雪突袭",
+    "description": "天空突然暗沉，乌云翻涌，暴风雪毫无征兆地袭来。能见度骤降至不足5米，风力达到8级以上。气温在数分钟内下降20度。",
+    "affectedNodes": ["maijiling", "feijiliang", "liang1", "liang2", "liang3", "taibailiang"],
+    "probability": 0.25,
+    "effects": {
+      "temperature": -20,
+      "windSpeed": 60,
+      "visibility": -90,
+      "health": -15,
+      "stamina": -10
+    }
+  },
+  {
+    "id": "weather_fog",
+    "name": "浓雾弥漫",
+    "description": "浓雾从山谷中升起，很快吞没了一切。能见度降至10米以内，方向感完全丧失。在刃脊上遇到浓雾是最危险的情况之一。",
+    "affectedNodes": ["daohangjia", "feijiliang", "wanxianzhen", "dongpaomaliang"],
+    "probability": 0.3,
+    "effects": {
+      "temperature": -5,
+      "windSpeed": 5,
+      "visibility": -80,
+      "health": -5,
+      "stamina": -5
+    }
+  },
+  {
+    "id": "weather_wind",
+    "name": "狂风大作",
+    "description": "风力突然加大到7-8级，在刃脊上几乎无法站立。碎石被风卷起，打在脸上生疼。帐篷被撕扯得啪啪作响。",
+    "affectedNodes": ["maijiling", "feijiliang", "taibailiang", "dongpaomaliang", "daohangjia"],
+    "probability": 0.35,
+    "effects": {
+      "temperature": -10,
+      "windSpeed": 50,
+      "visibility": -30,
+      "health": -8,
+      "stamina": -8
+    }
+  },
+  {
+    "id": "weather_hail",
+    "name": "冰雹突降",
+    "description": "天空突然砸下冰雹，大的如鸡蛋，小的如黄豆。在毫无遮挡的山脊上，冰雹打在身上如同石子。",
+    "affectedNodes": ["maijiling", "feijiliang", "taibailiang", "jinzita"],
+    "probability": 0.15,
+    "effects": {
+      "temperature": -8,
+      "windSpeed": 30,
+      "visibility": -50,
+      "health": -10,
+      "stamina": -5
+    }
+  },
+  {
+    "id": "weather_temp_drop",
+    "name": "极端温差",
+    "description": "鳌太线「一日历四季」的典型表现：白天阳光直射下体感温度可达30℃，入夜后骤降至零下25℃。出汗浸湿的衣物在夜间变成致命的冰衣。",
+    "affectedNodes": ["camp2900", "shuiwozi", "camp2800", "xiyuan", "dashiehe", "dongyuan"],
+    "probability": 0.4,
+    "effects": {
+      "temperature": -25,
+      "windSpeed": 10,
+      "visibility": 0,
+      "health": -12,
+      "stamina": -8
+    }
+  },
+  {
+    "id": "weather_clear",
+    "name": "短暂晴好",
+    "description": "难得的晴朗天气，阳光洒在雪线上，远处的山峰清晰可见。但不要被美景迷惑——鳌太线的天气随时可能变脸。",
+    "affectedNodes": [],
+    "probability": 0.2,
+    "effects": {
+      "temperature": 5,
+      "windSpeed": -10,
+      "visibility": 50,
+      "health": 3,
+      "stamina": 3
+    }
+  }
+]
