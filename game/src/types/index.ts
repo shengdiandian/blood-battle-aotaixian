@@ -7,9 +7,9 @@ export interface RouteNode {
   baseTimeCost: number;
   dangerLevel: number;
   weatherZones: string[];
-  coordinates: [number, number]; // [lng, lat]
+  coordinates: [number, number];
   description: string;
-  nextNodes: string[]; // 可前往的下一个节点ID
+  nextNodes: string[];
 }
 
 export interface Incident {
@@ -36,9 +36,12 @@ export interface PlayerState {
   dayCount: number;
   hourCount: number;
   weather: WeatherState;
-  gamePhase: 'start' | 'playing' | 'ended';
+  gamePhase: 'start' | 'playing' | 'event' | 'ended';
   ending?: string;
   log: LogEntry[];
+  pendingEvent: GameEvent | null;
+  visitedNodes: string[];
+  luck: number; // 运气值，影响随机事件
 }
 
 export interface Inventory {
@@ -52,6 +55,8 @@ export interface Inventory {
   hikingPoles: boolean;
   headlamp: boolean;
   firstAidKit: boolean;
+  rope: boolean;
+  sunglasses: boolean;
 }
 
 export interface WeatherState {
@@ -65,46 +70,81 @@ export interface WeatherState {
 export interface LogEntry {
   id: string;
   timestamp: number;
-  type: 'info' | 'warning' | 'danger' | 'success' | 'narrative';
+  type: 'info' | 'warning' | 'danger' | 'success' | 'narrative' | 'memorial';
   message: string;
 }
 
-export interface GameChoice {
-  id: string;
-  text: string;
-  effects: Partial<ChoiceEffect>;
-  condition?: (state: PlayerState) => boolean;
-  nextNode?: string;
-  narrative?: string;
-}
+// ===== 随机事件系统 =====
 
-export interface ChoiceEffect {
-  health: number;
-  stamina: number;
-  hydration: number;
-  hunger: number;
-  food: number;
-  water: number;
-  knowledgePoints: number;
-}
-
-export interface NPC {
+export interface GameEvent {
   id: string;
-  name: string;
-  basedOnIncident: string;
+  title: string;
   description: string;
-  encounterNode: string;
-  dialog: NPCDialog[];
+  category: 'terrain' | 'weather' | 'encounter' | 'discovery' | 'crisis' | 'memorial';
+  choices: EventChoice[];
+  /** 事件触发条件 */
+  condition?: EventCondition;
 }
 
-export interface NPCDialog {
+export interface EventChoice {
   id: string;
   text: string;
-  choices: {
-    text: string;
-    effect: string; // NPC结局影响描述
-    playerEffect: Partial<ChoiceEffect>;
-  }[];
+  narrative: string;
+  effects: EventEffect;
+  /** 选择后的概率事件（如：70%成功，30%失败） */
+  outcomes?: EventOutcome[];
+}
+
+export interface EventOutcome {
+  probability: number; // 0-1
+  narrative: string;
+  effects: EventEffect;
+  /** 装备获取 */
+  gainItems?: Partial<Inventory>;
+  /** 装备丢失 */
+  loseItems?: (keyof Inventory)[];
+}
+
+export interface EventEffect {
+  health?: number;
+  stamina?: number;
+  hydration?: number;
+  hunger?: number;
+  food?: number;
+  water?: number;
+  knowledgePoints?: number;
+  luck?: number;
+  /** 装备变化 */
+  gainItems?: Partial<Inventory>;
+  loseItems?: (keyof Inventory)[];
+  /** 天气变化 */
+  weatherChange?: {
+    temperature?: number;
+    windSpeed?: number;
+    visibility?: number;
+  };
+}
+
+export interface EventCondition {
+  minAltitude?: number;
+  maxAltitude?: number;
+  terrainTypes?: RouteNode['terrainType'][];
+  minDangerLevel?: number;
+  weatherConditions?: WeatherState['condition'][];
+  minHealth?: number;
+  maxHealth?: number;
+  minStamina?: number;
+  hasItem?: keyof Inventory;
+  lacksItem?: keyof Inventory;
+  minDay?: number;
+  maxDay?: number;
+  minHour?: number;
+  maxHour?: number;
+  minLuck?: number;
+  maxLuck?: number;
+  minFood?: number;
+  minWater?: number;
+  notVisited?: boolean; // 只在首次到访触发
 }
 
 export interface Ending {
@@ -112,7 +152,6 @@ export interface Ending {
   title: string;
   type: 'HE' | 'normal' | 'BE' | 'tragic';
   description: string;
-  condition: (state: PlayerState) => boolean;
 }
 
 export interface WeatherEvent {

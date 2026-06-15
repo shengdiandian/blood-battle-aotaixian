@@ -2,6 +2,7 @@ import { proxy } from 'valtio'
 import type { PlayerState, WeatherState, LogEntry } from '../types'
 import routeData from '../data/route.json'
 import type { RouteNode } from '../types'
+import { generateNodeEvents, generateMemorialEvent, randomizeWeather, processNaturalDecay, resolveChoice } from '../game/eventSystem'
 
 const routeNodes = routeData as RouteNode[]
 
@@ -31,6 +32,8 @@ const initialState: PlayerState = {
     hikingPoles: true,
     headlamp: true,
     firstAidKit: true,
+    rope: false,
+    sunglasses: false,
   },
   knowledgePoints: 0,
   alertedRisks: [],
@@ -39,6 +42,9 @@ const initialState: PlayerState = {
   weather: initialWeather,
   gamePhase: 'start',
   log: [],
+  pendingEvent: null,
+  visitedNodes: [],
+  luck: 0,
 }
 
 export const gameState = proxy<PlayerState>({ ...initialState })
@@ -96,6 +102,11 @@ export function moveToNode(nodeId: string) {
   gameState.progress = Math.round((targetNode.distance / 120) * 100)
   gameState.hourCount += targetNode.baseTimeCost
 
+  // 标记已访问
+  if (!gameState.visitedNodes.includes(nodeId)) {
+    gameState.visitedNodes.push(nodeId)
+  }
+
   // 消耗基础体力
   const staminaCost = targetNode.baseTimeCost * 5 + targetNode.dangerLevel * 3
   const hydrationCost = targetNode.baseTimeCost * 4
@@ -114,17 +125,91 @@ export function moveToNode(nodeId: string) {
     addLog('info', `第${gameState.dayCount}天开始了。`)
   }
 
-  addLog('narrative', `到达${targetNode.name}，海拔${targetNode.altitude}米。`)
+  addLog('narrative', `到达${targetNode.name}，海拔${targetNode.altitude}米。${targetNode.description}`)
+
+  // 随机化天气
+  randomizeWeather(nodeId)
+
+  // 自然衰减
+  processNaturalDecay()
+
+  // 生成随机事件
+  const event = generateNodeEvents(nodeId)
+  if (event) {
+    gameState.pendingEvent = event
+    gameState.gamePhase = 'event'
+    addLog('warning', event.title)
+    return // 等待玩家做出选择
+  }
+
+  // 没有随机事件，检查纪念事件
+  const memorialEvent = generateMemorialEvent(nodeId)
+  if (memorialEvent) {
+    gameState.pendingEvent = memorialEvent
+    gameState.gamePhase = 'event'
+    addLog('memorial', memorialEvent.title)
+    return
+  }
 
   // 检查是否到达终点
-  if (targetNode.nextNodes.length === 0) {
+  checkEndCondition(targetNode)
+}
+
+// 处理事件选择
+export function handleEventChoice(choiceId: string) {
+  const event = gameState.pendingEvent
+  if (!event) return
+
+  resolveChoice(event, choiceId)
+
+  // 清除待处理事件
+  gameState.pendingEvent = null
+
+  // 检查是否死亡
+  if (gameState.gamePhase === 'ended') return
+
+  // 如果当前事件是随机事件，再检查纪念事件
+  if (event.category !== 'memorial') {
+    const memorialEvent = generateMemorialEvent(gameState.currentNode)
+    if (memorialEvent) {
+      gameState.pendingEvent = memorialEvent
+      gameState.gamePhase = 'event'
+      addLog('memorial', memorialEvent.title)
+      return
+    }
+  }
+
+  // 回到正常游戏
+  gameState.gamePhase = 'playing'
+
+  // 检查是否到达终点
+  const currentNode = getCurrentNode()
+  checkEndCondition(currentNode)
+}
+
+// 跳过事件（仅纪念事件可跳过）
+export function skipEvent() {
+  if (!gameState.pendingEvent) return
+  if (gameState.pendingEvent.category !== 'memorial') return
+
+  addLog('info', '你默默走过，继续赶路。')
+  gameState.pendingEvent = null
+  gameState.gamePhase = 'playing'
+
+  const currentNode = getCurrentNode()
+  checkEndCondition(currentNode)
+}
+
+// 检查终点条件
+function checkEndCondition(node: RouteNode) {
+  if (node.nextNodes.length === 0) {
     gameState.gamePhase = 'ended'
     gameState.ending = 'ending_he'
     addLog('success', '你成功走出了鳌太线！')
   }
 }
 
-// 扎营休息
+// 扎营休息（含风险系统）
 export function makeCamp() {
   if (!gameState.inventory.tent) {
     addLog('warning', '你没有帐篷，无法扎营！')
@@ -153,10 +238,52 @@ export function makeCamp() {
   gameState.hourCount = 6
   gameState.dayCount += 1
 
+  // ===== 扎营风险系统 =====
+  const node = getCurrentNode()
+  const nightRisk = Math.random()
+
+  // 高海拔暴风雪：帐篷可能被摧毁
+  if (gameState.weather.condition === '暴风雪' && nightRisk < 0.35) {
+    gameState.inventory.tent = false
+    updatePlayerState({ health: -15 })
+    addLog('danger', '暴风雪摧毁了你的帐篷！你在寒冷中度过了一夜，严重失温。')
+  }
+  // 高海拔大风：帐篷可能损坏
+  else if (node.altitude > 3000 && gameState.weather.windSpeed > 30 && nightRisk < 0.3) {
+    gameState.inventory.tent = false
+    updatePlayerState({ health: -10 })
+    addLog('danger', '夜间狂风撕毁了帐篷！你不得不在风中熬到天亮。')
+  }
+  // 动物偷食物
+  else if (nightRisk < 0.25) {
+    const foodLost = Math.min(gameState.inventory.food, Math.random() < 0.5 ? 1 : 2)
+    if (foodLost > 0) {
+      gameState.inventory.food = Math.max(0, gameState.inventory.food - foodLost)
+      addLog('warning', `夜间有动物光顾营地，偷走了${foodLost}份食物。`)
+    }
+  }
+  // 营地进水（下雨天）
+  else if (gameState.weather.condition === '大雨' && nightRisk < 0.4) {
+    if (gameState.inventory.sleepingBag && Math.random() < 0.4) {
+      gameState.inventory.sleepingBag = false
+      updatePlayerState({ health: -8 })
+      addLog('danger', '大雨导致营地进水，睡袋被浸湿无法使用！')
+    } else {
+      updatePlayerState({ health: -5 })
+      addLog('warning', '大雨导致营地进水，你被淋湿了。')
+    }
+  }
+
   // 夜间温度影响
   if (!hasSleepingBag) {
     updatePlayerState({ health: -10 })
     addLog('warning', '没有睡袋，夜间失温严重。')
+  }
+
+  // 高海拔额外失温
+  if (node.altitude > 3400) {
+    updatePlayerState({ health: -5 })
+    addLog('warning', '高海拔夜间极寒，体温持续下降。')
   }
 
   addLog('info', `你在帐篷中休息了一夜。第${gameState.dayCount}天清晨。`)
@@ -227,9 +354,9 @@ export function updateWeather(weatherEffect: {
 
 // 开始游戏
 export function startGame() {
-  Object.assign(gameState, { ...initialState, gamePhase: 'playing', log: [] })
+  Object.assign(gameState, { ...initialState, gamePhase: 'playing', log: [], visitedNodes: ['tangkou'] })
   addLog('narrative', '你站在塘口村的村口，背对着温暖的人间，面向秦岭的苍茫群山。鳌太线——这条被称作"中华龙脊"的穿越路线，将在前方170公里的山脊上考验你的每一步。')
-  addLog('info', '提示：注意管理你的体温、体力、水分和饥饿。任一数值归零，游戏结束。')
+  addLog('info', '提示：注意管理你的体温、体力、水分和饥饿。任一数值归零，游戏结束。每次到达新地点，你将面临随机事件，做出选择将影响你的命运。')
 }
 
 // 重置游戏
@@ -259,16 +386,16 @@ function checkDeathCondition() {
 
   // 低值警告
   if (gameState.health > 0 && gameState.health <= 20) {
-    addLog('warning', '⚠ 体温严重过低，请尽快保暖！')
+    addLog('warning', '体温严重过低，请尽快保暖！')
   }
   if (gameState.stamina > 0 && gameState.stamina <= 20) {
-    addLog('warning', '⚠ 体力即将耗尽，请休息！')
+    addLog('warning', '体力即将耗尽，请休息！')
   }
   if (gameState.hydration > 0 && gameState.hydration <= 20) {
-    addLog('warning', '⚠ 严重缺水，请补充水分！')
+    addLog('warning', '严重缺水，请补充水分！')
   }
   if (gameState.hunger > 0 && gameState.hunger <= 20) {
-    addLog('warning', '⚠ 严重饥饿，请进食！')
+    addLog('warning', '严重饥饿，请进食！')
   }
 }
 

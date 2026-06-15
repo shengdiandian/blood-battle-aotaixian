@@ -1,261 +1,317 @@
-import { gameState, addLog, updatePlayerState, updateWeather, getCurrentNode } from '../store/gameStore'
-import type { WeatherEvent } from '../types'
-import weatherData from '../data/weather.json'
+import { gameState, addLog, updatePlayerState, getCurrentNode } from '../store/gameStore'
+import type { GameEvent, EventCondition, EventOutcome } from '../types'
+import { eventPool } from './eventPool'
+import incidentsData from '../data/incidents.json'
+import type { Incident } from '../types'
 
-const weatherEvents = weatherData as WeatherEvent[]
+const incidents = incidentsData as Incident[]
 
-// 固定事件：到达特定节点时触发
-const fixedEvents: Record<string, () => void> = {
-  jinnianbei: () => {
-    addLog('narrative', '你站在遇难山友纪念碑前，石碑上刻着一个个名字。每一个名字背后，都是一条在鳌太线上消逝的生命。你默默站了很久，心中升起一种复杂的情感——敬畏、恐惧，还有一丝说不清的执念。')
-    updatePlayerState({ knowledgePoints: 3 })
-    addLog('success', '你获得了3点事故知识。了解历史，才能避免重蹈覆辙。')
-  },
-  maijiling: () => {
-    addLog('narrative', '麦秸岭——鳌太线上最危险的刃脊之一。风在这里大得几乎站不稳人，两侧是近乎垂直的陡坡。天气毫无征兆地开始变化……')
-    // 麦秸岭必触发恶劣天气
-    updateWeather({ temperature: -15, windSpeed: 40, visibility: -60 })
-    addLog('danger', '天气骤变！暴风雪正在逼近！')
-  },
-  feijiliang: () => {
-    addLog('narrative', '飞机梁——因形似飞机机翼而得名。这里是鳌太线上暴风雪最频繁的区域，多起致命事故发生于此。石海遍布，每一步都可能踩空。')
-    // 飞机梁高概率恶劣天气
-    if (Math.random() < 0.6) {
-      updateWeather({ temperature: -20, windSpeed: 50, visibility: -80 })
-      addLog('danger', '暴风雪突袭！能见度骤降！')
-    }
-  },
-  taibailiang: () => {
-    addLog('narrative', '太白梁——海拔超过3500米的死亡地带。高反症状在这里最为明显：头痛欲裂、恶心想吐、四肢无力。你感觉每走一步都像是在水中前行。')
-    updatePlayerState({ stamina: -10, health: -5 })
-    addLog('warning', '高海拔导致身体不适，体力和体温下降。')
-  },
-  dayehai: () => {
-    addLog('narrative', '大爷海——碧蓝的高山冰斗湖在群山环抱中如同一颗宝石。这是鳌太线上最后的补给点，你可以在这里补充水源。')
-    gameState.inventory.water = Math.min(gameState.inventory.water + 3, 8)
-    updatePlayerState({ hydration: 15 })
-    addLog('success', '你在大爷海补充了水源。')
-  },
-  baxiantai: () => {
-    addLog('narrative', '拔仙台——秦岭主峰，海拔3767.2米！你站在云海之上，脚下是翻涌的白云，远处是连绵的群山。这一刻，所有的艰辛都化作了脚下的风景。但你深知，下山的路同样致命。')
-    updatePlayerState({ knowledgePoints: 5 })
-    addLog('success', '登顶拔仙台！获得5点事故知识。')
-  },
+// 已触发事件记录，避免短时间内重复
+const recentlyTriggered: string[] = []
+const MAX_RECENT = 12
+
+function markTriggered(eventId: string) {
+  recentlyTriggered.push(eventId)
+  if (recentlyTriggered.length > MAX_RECENT) recentlyTriggered.shift()
 }
 
-// 随机事件池
-const randomEvents = [
-  {
-    name: '发现前人遗留的补给',
-    probability: 0.15,
-    condition: () => gameState.inventory.food < 3 || gameState.inventory.water < 3,
-    execute: () => {
-      gameState.inventory.food += 1
-      gameState.inventory.water += 1
-      addLog('success', '你在路边发现了一个被遗弃的背包，里面还有些食物和水。前人的遗留，成了你的救命稻草。')
-    }
-  },
-  {
-    name: '碎石滑落',
-    probability: 0.2,
-    condition: () => {
-      const node = getCurrentNode()
-      return node.terrainType === '刃脊' || node.terrainType === '石海'
-    },
-    execute: () => {
-      if (gameState.inventory.hikingPoles) {
-        addLog('info', '脚下的碎石突然滑动，你用登山杖稳住了身体！')
-        updatePlayerState({ stamina: -5 })
-      } else {
-        addLog('danger', '脚下的碎石突然滑动，你差点摔下去！没有登山杖，你只能靠双手抓住岩石。')
-        updatePlayerState({ health: -10, stamina: -10 })
-      }
-    }
-  },
-  {
-    name: '高反发作',
-    probability: 0.25,
-    condition: () => getCurrentNode().altitude >= 3400,
-    execute: () => {
-      addLog('warning', '头痛加剧，视线模糊——高反症状发作了。你需要放慢速度。')
-      updatePlayerState({ stamina: -15, health: -5 })
-    }
-  },
-  {
-    name: '发现事故痕迹',
-    probability: 0.2,
-    condition: () => gameState.knowledgePoints < 10,
-    execute: () => {
-      addLog('narrative', '你在路边发现了一个破损的帐篷和散落的装备。这些物品的主人，恐怕已经不在了……')
-      updatePlayerState({ knowledgePoints: 2 })
-      addLog('info', '你获得了2点事故知识。')
-    }
-  },
-  {
-    name: '水源补给',
-    probability: 0.2,
-    condition: () => {
-      const node = getCurrentNode()
-      return node.terrainType === '营地' || node.name.includes('河')
-    },
-    execute: () => {
-      gameState.inventory.water = Math.min(gameState.inventory.water + 2, 8)
-      updatePlayerState({ hydration: 10 })
-      addLog('success', '你找到了一处水源，补充了水量。')
-    }
-  },
-  {
-    name: '幻觉出现',
-    probability: 0.1,
-    condition: () => gameState.health < 30 && gameState.stamina < 30,
-    execute: () => {
-      addLog('danger', '你开始出现幻觉——看到前方有人影在招手，但揉揉眼睛又什么都没有。这是严重失温的信号！')
-      updatePlayerState({ health: -8 })
-    }
-  },
-  {
-    name: '失温前兆',
-    probability: 0.3,
-    condition: () => gameState.health < 40 && gameState.weather.temperature < -5,
-    execute: () => {
-      if (gameState.inventory.warmClothes) {
-        addLog('info', '你感到一阵寒意，但厚实的衣物帮你挡住了最冷的风。')
-        updatePlayerState({ health: -3 })
-      } else {
-        addLog('danger', '寒冷刺骨！你没有足够的保暖衣物，体温在快速下降。失温正在逼近！')
-        updatePlayerState({ health: -15 })
-      }
-    }
-  },
-  {
-    name: '通讯中断',
-    probability: 0.3,
-    condition: () => getCurrentNode().altitude > 3000,
-    execute: () => {
-      if (!gameState.inventory.satelliteDevice) {
-        addLog('warning', '手机没有信号。在这片无人区，你与外界的联系完全中断了。')
-      } else {
-        addLog('info', '手机没有信号，但卫星电话还可以使用。你至少还有最后的通信手段。')
-      }
-    }
-  },
-]
-
-// NPC事件
-const npcEvents = [
-  {
-    nodeId: 'camp2900',
-    npc: {
-      name: '独自穿越的男子',
-      basedOnIncident: 'inc_2025_09',
-      dialog: '你好，我也是一个人走鳌太。天气预报说这几天还算稳定，应该没问题吧？',
-    },
-    execute: () => {
-      addLog('narrative', '在2900营地，你遇到了一名独自穿越的男子。他看起来装备还算齐全，但对天气的判断似乎过于乐观。')
-    }
-  },
-  {
-    nodeId: 'shuiwozi',
-    npc: {
-      name: '18岁的少年',
-      basedOnIncident: 'inc_2025_02',
-      dialog: '哥，我才18岁，第一次走鳌太。听说有人走完全程了，我也可以的！',
-    },
-    execute: () => {
-      addLog('narrative', '在水窝子营地，你遇到了一个18岁的少年。他年纪不大，眼神里却满是倔强和不服输。')
-    }
-  },
-  {
-    nodeId: 'feijiliang',
-    npc: {
-      name: '5人穿越小队',
-      basedOnIncident: 'inc_2026_01',
-      dialog: '我们5个人一起走的，人多安全嘛！暴风雪？不会那么倒霉吧？',
-    },
-    execute: () => {
-      addLog('narrative', '在飞机梁，你遇到了一支5人穿越小队。他们看起来信心满满，但装备参差不齐。')
-    }
-  },
-  {
-    nodeId: 'dongpaomaliang',
-    npc: {
-      name: '失踪少年的影子',
-      basedOnIncident: 'inc_2025_10',
-      dialog: '（你似乎看到远处有一个年轻的身影在雾中若隐若现……）',
-    },
-    execute: () => {
-      addLog('narrative', '在东跑马梁的浓雾中，你隐约看到远处有一个年轻的身影。是幻觉？还是那个失踪的少年？你揉了揉眼睛，身影已经消失在雾中。')
-      updatePlayerState({ knowledgePoints: 2 })
-    }
-  },
-]
-
-// 处理到达节点时的所有事件
-export function processNodeEvents(nodeId: string) {
-  // 1. 固定事件
-  if (fixedEvents[nodeId]) {
-    fixedEvents[nodeId]()
-  }
-
-  // 2. 随机事件
-  for (const event of randomEvents) {
-    if (event.condition() && Math.random() < event.probability) {
-      event.execute()
-    }
-  }
-
-  // 3. 天气事件
-  processWeatherEvents(nodeId)
-
-  // 4. NPC事件
-  const npcEvent = npcEvents.find(e => e.nodeId === nodeId)
-  if (npcEvent && Math.random() < 0.7) {
-    npcEvent.execute()
-  }
-
-  // 5. 自然状态衰减
-  processNaturalDecay()
-}
-
-// 处理天气事件
-function processWeatherEvents(nodeId: string) {
-  for (const weatherEvent of weatherEvents) {
-    const affectsNode = weatherEvent.affectedNodes.length === 0 ||
-      weatherEvent.affectedNodes.includes(nodeId)
-    if (affectsNode && Math.random() < weatherEvent.probability) {
-      addLog('narrative', weatherEvent.description)
-      updateWeather({
-        temperature: weatherEvent.effects.temperature,
-        windSpeed: weatherEvent.effects.windSpeed,
-        visibility: weatherEvent.effects.visibility,
-      })
-      updatePlayerState({
-        health: weatherEvent.effects.health,
-        stamina: weatherEvent.effects.stamina,
-      })
-      break // 每个节点最多触发一个天气事件
-    }
-  }
-}
-
-// 自然状态衰减（每到达一个节点）
-function processNaturalDecay() {
+// ===== 条件检查 =====
+function checkCondition(condition?: EventCondition): boolean {
+  if (!condition) return true
   const node = getCurrentNode()
-  const altitudeFactor = node.altitude > 3000 ? 1.5 : 1
-  const dangerFactor = 1 + node.dangerLevel * 0.1
+  const state = gameState
 
-  // 基础衰减
+  if (condition.minAltitude && node.altitude < condition.minAltitude) return false
+  if (condition.maxAltitude && node.altitude > condition.maxAltitude) return false
+  if (condition.terrainTypes && !condition.terrainTypes.includes(node.terrainType)) return false
+  if (condition.minDangerLevel && node.dangerLevel < condition.minDangerLevel) return false
+  if (condition.weatherConditions && !condition.weatherConditions.includes(state.weather.condition)) return false
+  if (condition.minHealth && state.health < condition.minHealth) return false
+  if (condition.maxHealth && state.health > condition.maxHealth) return false
+  if (condition.minStamina && state.stamina < condition.minStamina) return false
+  if (condition.hasItem && !state.inventory[condition.hasItem]) return false
+  if (condition.lacksItem && state.inventory[condition.lacksItem]) return false
+  if (condition.minDay && state.dayCount < condition.minDay) return false
+  if (condition.maxDay && state.dayCount > condition.maxDay) return false
+  if (condition.minHour && state.hourCount < condition.minHour) return false
+  if (condition.maxHour && state.hourCount > condition.maxHour) return false
+  if (condition.minLuck && state.luck < condition.minLuck) return false
+  if (condition.maxLuck && state.luck > condition.maxLuck) return false
+  if (condition.minFood && state.inventory.food < condition.minFood) return false
+  if (condition.minWater && state.inventory.water < condition.minWater) return false
+  if (condition.notVisited && state.visitedNodes.includes(state.currentNode)) return false
+
+  return true
+}
+
+// ===== 生成随机事件（带权重和去重） =====
+export function generateNodeEvents(_nodeId: string): GameEvent | null {
+  // 1. 筛选满足条件且不在最近触发列表中的事件
+  let eligibleEvents = eventPool.filter(evt =>
+    checkCondition(evt.condition) && !recentlyTriggered.includes(evt.id)
+  )
+
+  // 如果全部触发过，清空记录重来
+  if (eligibleEvents.length === 0) {
+    recentlyTriggered.length = 0
+    eligibleEvents = eventPool.filter(evt => checkCondition(evt.condition))
+  }
+
+  if (eligibleEvents.length === 0) return null
+
+  // 2. 权重随机：危机类事件权重更高（增加难度）
+  const weights = eligibleEvents.map(evt => {
+    if (evt.category === 'crisis') return 2.0
+    if (evt.category === 'weather') return 1.5
+    if (evt.category === 'terrain') return 1.3
+    return 1.0
+  })
+  const totalWeight = weights.reduce((a, b) => a + b, 0)
+  let roll = Math.random() * totalWeight
+  let selectedEvent = eligibleEvents[0]
+  for (let i = 0; i < eligibleEvents.length; i++) {
+    roll -= weights[i]
+    if (roll <= 0) {
+      selectedEvent = eligibleEvents[i]
+      break
+    }
+  }
+
+  // 3. 过滤选项条件
+  const filteredChoices = selectedEvent.choices.filter(choice => {
+    if ((choice as any).condition) return checkCondition((choice as any).condition)
+    return true
+  })
+  if (filteredChoices.length === 0) return null
+
+  // 4. 标记已触发
+  markTriggered(selectedEvent.id)
+
+  return { ...selectedEvent, choices: filteredChoices }
+}
+
+// ===== 生成纪念事件 =====
+export function generateMemorialEvent(_nodeId: string): GameEvent | null {
+  const node = getCurrentNode()
+  const relatedIncidents = incidents.filter(inc => inc.location === node.name)
+  if (relatedIncidents.length === 0) return null
+
+  // 30%概率触发纪念事件
+  if (Math.random() > 0.3) return null
+
+  const incident = relatedIncidents[Math.floor(Math.random() * relatedIncidents.length)]
+
+  return {
+    id: `memorial_${incident.id}`,
+    title: '逝者的痕迹',
+    description: `你在这片区域发现了一块小小的纪念标记。这里曾发生过真实的事故——${incident.date}，${incident.description}`,
+    category: 'memorial',
+    choices: [
+      {
+        id: `memorial_${incident.id}_a`,
+        text: '默哀致敬',
+        narrative: `你停下脚步，在纪念标记前默默站立。${incident.victims > 1 ? `${incident.victims}条生命` : '一条生命'}在这里消逝。`,
+        effects: { knowledgePoints: 3 },
+        outcomes: [{ probability: 1, narrative: '愿逝者安息。你更加坚定了安全完成穿越的决心。', effects: { luck: 1 } }],
+      },
+      {
+        id: `memorial_${incident.id}_b`,
+        text: '阅读事故详情',
+        narrative: `你仔细阅读了纪念标记上的文字。${incident.type}事故，${incident.victims}人遇难。`,
+        effects: { knowledgePoints: 5 },
+        outcomes: [{ probability: 1, narrative: '这些教训值得铭记。你更加警惕了。', effects: { knowledgePoints: 2 } }],
+      },
+    ],
+  }
+}
+
+// ===== 处理事件选择 =====
+export function resolveChoice(event: GameEvent, choiceId: string) {
+  const choice = event.choices.find(c => c.id === choiceId)
+  if (!choice) return
+
+  // 应用选择的即时效果
+  applyEffects(choice.effects)
+
+  // 处理装备获取
+  if (choice.effects.gainItems) {
+    applyGainItems(choice.effects.gainItems)
+  }
+
+  // 处理装备丢失
+  if (choice.effects.loseItems) {
+    applyLoseItems(choice.effects.loseItems)
+  }
+
+  // 如果有概率事件，随机选择一个结果
+  if (choice.outcomes && choice.outcomes.length > 0) {
+    const outcome = rollOutcome(choice.outcomes)
+    if (outcome) {
+      // 延迟显示结果叙述（通过日志）
+      addLog('narrative', outcome.narrative)
+      applyEffects(outcome.effects)
+
+      if (outcome.gainItems) {
+        applyGainItems(outcome.gainItems)
+      }
+      if (outcome.loseItems) {
+        applyLoseItems(outcome.loseItems)
+      }
+    }
+  } else {
+    // 没有概率事件，直接显示选择叙述
+    addLog('narrative', choice.narrative)
+  }
+}
+
+// ===== 概率选择 =====
+function rollOutcome(outcomes: EventOutcome[]): EventOutcome | null {
+  const roll = Math.random()
+  let cumulative = 0
+  for (const outcome of outcomes) {
+    cumulative += outcome.probability
+    if (roll <= cumulative) return outcome
+  }
+  return outcomes[outcomes.length - 1] // 兜底
+}
+
+// ===== 应用效果 =====
+function applyEffects(effects: Record<string, any>) {
+  if (!effects) return
+
+  if (effects.health) updatePlayerState({ health: effects.health })
+  if (effects.stamina) updatePlayerState({ stamina: effects.stamina })
+  if (effects.hydration) updatePlayerState({ hydration: effects.hydration })
+  if (effects.hunger) updatePlayerState({ hunger: effects.hunger })
+  if (effects.food) updatePlayerState({ food: effects.food })
+  if (effects.water) updatePlayerState({ water: effects.water })
+  if (effects.knowledgePoints) updatePlayerState({ knowledgePoints: effects.knowledgePoints })
+  if (effects.luck) {
+    gameState.luck = Math.max(-5, Math.min(10, gameState.luck + effects.luck))
+  }
+}
+
+// ===== 应用装备获取 =====
+function applyGainItems(gainItems: Record<string, any>) {
+  if (!gainItems) return
+  const inv = gameState.inventory as Record<string, any>
+  for (const [key, value] of Object.entries(gainItems)) {
+    if (key in inv) {
+      inv[key] = value
+      addLog('success', `获得了装备：${getItemName(key)}`)
+    }
+  }
+}
+
+// ===== 应用装备丢失 =====
+function applyLoseItems(loseItems: string[]) {
+  if (!loseItems) return
+  const inv = gameState.inventory as Record<string, any>
+  for (const key of loseItems) {
+    if (key in inv && inv[key]) {
+      inv[key] = typeof inv[key] === 'boolean' ? false : 0
+      addLog('danger', `失去了装备：${getItemName(key)}`)
+    }
+  }
+}
+
+// ===== 装备名称映射 =====
+function getItemName(key: string): string {
+  const names: Record<string, string> = {
+    tent: '帐篷',
+    sleepingBag: '睡袋',
+    food: '食物',
+    water: '水',
+    gps: 'GPS',
+    satelliteDevice: '卫星电话',
+    warmClothes: '保暖衣物',
+    hikingPoles: '登山杖',
+    headlamp: '头灯',
+    firstAidKit: '急救包',
+    rope: '绳索',
+    sunglasses: '墨镜',
+  }
+  return names[key] || key
+}
+
+// ===== 天气随机化 =====
+export function randomizeWeather(_nodeId: string) {
+  const node = getCurrentNode()
+  const state = gameState
+
+  // 基于海拔和地形随机化天气
+  const altitudeFactor = node.altitude / 4000
+  const random = Math.random()
+
+  // 高海拔更容易恶劣天气
+  if (altitudeFactor > 0.85 && random < 0.25) {
+    state.weather.condition = '暴风雪'
+    state.weather.temperature = -15 + Math.floor(Math.random() * 10)
+    state.weather.windSpeed = 30 + Math.floor(Math.random() * 30)
+    state.weather.visibility = 10 + Math.floor(Math.random() * 20)
+    state.weather.isDeteriorating = true
+    addLog('danger', '暴风雪来袭！气温骤降，能见度极低。')
+  } else if (altitudeFactor > 0.7 && random < 0.3) {
+    state.weather.condition = '冰雹'
+    state.weather.temperature = -5 + Math.floor(Math.random() * 10)
+    state.weather.windSpeed = 20 + Math.floor(Math.random() * 20)
+    state.weather.visibility = 30 + Math.floor(Math.random() * 30)
+    state.weather.isDeteriorating = true
+    addLog('warning', '天空下起了冰雹！')
+  } else if (altitudeFactor > 0.6 && random < 0.35) {
+    state.weather.condition = '雾'
+    state.weather.temperature = 0 + Math.floor(Math.random() * 10)
+    state.weather.windSpeed = 5 + Math.floor(Math.random() * 10)
+    state.weather.visibility = 15 + Math.floor(Math.random() * 20)
+    state.weather.isDeteriorating = true
+    addLog('warning', '浓雾升起，能见度下降。')
+  } else if (random < 0.2) {
+    state.weather.condition = '大雨'
+    state.weather.temperature = 5 + Math.floor(Math.random() * 10)
+    state.weather.windSpeed = 15 + Math.floor(Math.random() * 20)
+    state.weather.visibility = 20 + Math.floor(Math.random() * 30)
+    state.weather.isDeteriorating = true
+    addLog('warning', '下起了大雨。')
+  } else if (random < 0.4) {
+    state.weather.condition = '多云'
+    state.weather.temperature = 10 + Math.floor(Math.random() * 15) - altitudeFactor * 20
+    state.weather.windSpeed = 5 + Math.floor(Math.random() * 15)
+    state.weather.visibility = 60 + Math.floor(Math.random() * 30)
+    state.weather.isDeteriorating = false
+  } else {
+    state.weather.condition = '晴'
+    state.weather.temperature = 15 + Math.floor(Math.random() * 10) - altitudeFactor * 25
+    state.weather.windSpeed = Math.floor(Math.random() * 10)
+    state.weather.visibility = 80 + Math.floor(Math.random() * 20)
+    state.weather.isDeteriorating = false
+  }
+}
+
+// ===== 自然衰减 =====
+export function processNaturalDecay() {
+  const state = gameState
+  const node = getCurrentNode()
+
+  // 高海拔消耗更多
+  const altitudePenalty = node.altitude > 3400 ? 1.5 : node.altitude > 3000 ? 1.2 : 1.0
+
+  // 恶劣天气额外消耗
+  const weatherPenalty = state.weather.isDeteriorating ? 1.3 : 1.0
+
+  // 体力自然衰减
+  const staminaDecay = Math.round(3 * altitudePenalty * weatherPenalty)
+  const hydrationDecay = Math.round(4 * altitudePenalty * weatherPenalty)
+  const hungerDecay = Math.round(3 * altitudePenalty * weatherPenalty)
+
   updatePlayerState({
-    hydration: -2 * altitudeFactor,
-    hunger: -1.5 * altitudeFactor,
-    stamina: -3 * dangerFactor,
+    stamina: -staminaDecay,
+    hydration: -hydrationDecay,
+    hunger: -hungerDecay,
   })
 
-  // 天气影响衰减
-  if (gameState.weather.temperature < -10) {
-    updatePlayerState({ health: -3 })
-  }
-  if (gameState.weather.windSpeed > 30) {
-    updatePlayerState({ stamina: -2 })
+  // 暴风雪额外伤害
+  if (state.weather.condition === '暴风雪') {
+    updatePlayerState({ health: -5 })
+    addLog('danger', '暴风雪中持续失温！')
   }
 }

@@ -100,6 +100,12 @@ export default function StatusPanel() {
           <span className={state.inventory.firstAidKit ? 'text-success-400' : 'text-mountain-500'}>
             💊 急救包
           </span>
+          <span className={state.inventory.rope ? 'text-success-400' : 'text-mountain-500'}>
+            🪢 绳索
+          </span>
+          <span className={state.inventory.sunglasses ? 'text-success-400' : 'text-mountain-500'}>
+            🕶️ 墨镜
+          </span>
         </div>
         <div className="mt-2 space-y-1 text-xs text-mountain-300">
           <div>🍞 食物 ×{state.inventory.food}</div>
@@ -107,10 +113,15 @@ export default function StatusPanel() {
         </div>
       </div>
 
-      {state.knowledgePoints > 0 && (
+      {(state.knowledgePoints > 0 || state.luck > 0) && (
         <div className="mt-4 pt-3 border-t border-mountain-700">
-          <h3 className="text-xs font-bold text-mountain-300 mb-1">事故知识</h3>
-          <div className="text-xs text-warning-400">📚 {state.knowledgePoints} 点</div>
+          <h3 className="text-xs font-bold text-mountain-300 mb-1">其他</h3>
+          {state.knowledgePoints > 0 && (
+            <div className="text-xs text-warning-400">📚 事故知识 {state.knowledgePoints} 点</div>
+          )}
+          {state.luck > 0 && (
+            <div className="text-xs text-green-400">🍀 运气 {state.luck.toFixed(1)}</div>
+          )}
         </div>
       )}
     </div>

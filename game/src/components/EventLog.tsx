@@ -5,12 +5,13 @@ import { ScrollText } from 'lucide-react'
 export default function EventLog() {
   const state = useSnapshot(gameState)
 
-  const typeStyle = {
+  const typeStyle: Record<string, string> = {
     danger: 'text-danger-400 border-danger-500/30',
     warning: 'text-warning-400 border-warning-500/30',
     success: 'text-success-400 border-success-500/30',
     narrative: 'text-ice-400 border-ice-500/30',
     info: 'text-mountain-300 border-mountain-600/30',
+    memorial: 'text-purple-400 border-purple-500/30',
   }
 
   return (
