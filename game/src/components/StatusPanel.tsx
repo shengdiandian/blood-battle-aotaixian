@@ -2,12 +2,11 @@ import { useSnapshot } from 'valtio'
 import { gameState } from '../store/gameStore'
 import { Thermometer, Heart, Droplets, Utensils, MapPin, Clock, CloudSun, Backpack, Star } from 'lucide-react'
 
-function StatusBar({ icon: Icon, label, value, color,危急 }: {
+function StatusBar({ icon: Icon, label, value, color }: {
   icon: React.ElementType
   label: string
   value: number
   color: string
-  危急?: boolean
 }) {
   const isDanger = value <= 20
   const isWarning = value <= 40
