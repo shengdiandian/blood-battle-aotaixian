@@ -202,39 +202,6 @@ export default function GamePanel() {
             <Heart size={13} /> 急救
           </button>
         </div>
-          </div>
-        )}
-
-        {/* Utility buttons */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={makeCamp}
-            disabled={!state.inventory.tent}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
-              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
-              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100"
-          >
-            <Tent size={13} /> 扎营休息
-          </button>
-          <button
-            onClick={eatAndDrink}
-            disabled={state.inventory.food <= 0 && state.inventory.water <= 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
-              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
-              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100"
-          >
-            <UtensilsCrossed size={13} /> 进食补水
-          </button>
-          <button
-            onClick={useFirstAid}
-            disabled={!state.inventory.firstAidKit}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
-              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
-              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100"
-          >
-            <Heart size={13} /> 使用急救包
-          </button>
-        </div>
       </div>
     </div>
   )
