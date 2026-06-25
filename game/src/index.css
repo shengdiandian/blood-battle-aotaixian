@@ -18,6 +18,12 @@
   --color-warning-400: #fbbf24;
   --color-success-500: #22c55e;
   --color-success-400: #4ade80;
+  --color-snow: #e0eaff;
+  --color-frost: #a8c8ff;
+  --color-dawn: #ff9966;
+  --color-dusk: #663399;
+  --color-blood: #cc3333;
+  --color-memorial: #b088f9;
 }
 
 * {
@@ -29,7 +35,7 @@
 body {
   background-color: var(--color-mountain-900);
   color: var(--color-mountain-200);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', 'SimSun', Georgia, serif;
   min-height: 100vh;
 }
 
@@ -45,11 +51,11 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-mountain-800);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -59,4 +65,284 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-mountain-500);
+}
+
+/* ===== Atmospheric Animations ===== */
+
+@keyframes snowfall {
+  0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(105vh) translateX(30px); opacity: 0; }
+}
+
+@keyframes snowfall-strong {
+  0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.9; }
+  100% { transform: translateY(105vh) translateX(80px); opacity: 0; }
+}
+
+@keyframes fogDrift {
+  0% { transform: translateX(-20%); opacity: 0.03; }
+  50% { opacity: 0.08; }
+  100% { transform: translateX(120%); opacity: 0.03; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes typewriter {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 500px; opacity: 1; }
+}
+
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes lightning {
+  0%, 94%, 96%, 98%, 100% { opacity: 0; }
+  95% { opacity: 0.8; }
+  97% { opacity: 0.4; }
+}
+
+@keyframes dangerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(239, 68, 68, 0.3); }
+}
+
+@keyframes warningPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  50% { box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.2); }
+}
+
+@keyframes rainDrop {
+  0% { transform: translateY(-10vh); opacity: 0.7; }
+  100% { transform: translateY(105vh); opacity: 0; }
+}
+
+/* Snow particle */
+.snow-particle {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  background: white;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 999;
+  animation: snowfall linear infinite;
+}
+
+.snow-particle.strong {
+  width: 4px;
+  height: 4px;
+  animation: snowfall-strong linear infinite;
+  opacity: 0.9;
+}
+
+/* Rain particle */
+.rain-particle {
+  position: fixed;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(transparent, rgba(150, 200, 255, 0.5));
+  pointer-events: none;
+  z-index: 999;
+  animation: rainDrop linear infinite;
+}
+
+/* Fog layer */
+.fog-layer {
+  position: fixed;
+  top: 0;
+  left: -20%;
+  width: 140%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, rgba(200, 210, 230, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 998;
+  animation: fogDrift 25s ease-in-out infinite alternate;
+}
+
+/* Lightning overlay */
+.lightning-overlay {
+  position: fixed;
+  inset: 0;
+  background: white;
+  pointer-events: none;
+  z-index: 1000;
+  animation: lightning 8s linear infinite;
+}
+
+/* Scene background gradients */
+.scene-bg-clear {
+  background: linear-gradient(180deg, #0a1628 0%, #0f1d35 30%, #111827 100%);
+}
+
+.scene-bg-cloudy {
+  background: linear-gradient(180deg, #0f1520 0%, #1a2230 40%, #111827 100%);
+}
+
+.scene-bg-fog {
+  background: linear-gradient(180deg, #1a2030 0%, #253040 40%, #111827 100%);
+}
+
+.scene-bg-storm {
+  background: linear-gradient(180deg, #0a0d12 0%, #151a22 40%, #0d1117 100%);
+}
+
+.scene-bg-snow {
+  background: linear-gradient(180deg, #0e1520 0%, #18202d 40%, #111827 100%);
+}
+
+/* Status bar glow */
+.status-bar-danger {
+  animation: dangerPulse 2s ease-in-out infinite;
+}
+
+.status-bar-warning {
+  animation: warningPulse 2.5s ease-in-out infinite;
+}
+
+/* Card hover effects */
+.card-atmosphere {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-atmosphere::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Story text styling */
+.story-text {
+  line-height: 2;
+  letter-spacing: 0.05em;
+  text-indent: 2em;
+}
+
+.story-text p + p {
+  margin-top: 1em;
+}
+
+/* Memorial styling */
+.memorial-card {
+  background: linear-gradient(135deg, rgba(176, 136, 249, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(176, 136, 249, 0.2);
+  position: relative;
+}
+
+.memorial-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(176, 136, 249, 0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Event category colors */
+.event-terrain { border-left-color: #f97316; }
+.event-weather { border-left-color: #3b82f6; }
+.event-encounter { border-left-color: #22c55e; }
+.event-discovery { border-left-color: #eab308; }
+.event-crisis { border-left-color: #ef4444; }
+.event-memorial { border-left-color: #a78bfa; }
+
+/* Mountain silhouette decoration */
+.mountain-silhouette {
+  position: relative;
+}
+
+.mountain-silhouette::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(0deg, var(--color-mountain-900) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Prologue text reveal */
+.prologue-reveal {
+  animation: typewriter 3s ease-out forwards;
+  overflow: hidden;
+}
+
+/* Button mountain style */
+.btn-mountain {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #1e40af 100%);
+  background-size: 200% 200%;
+  transition: all 0.3s ease;
+}
+
+.btn-mountain:hover {
+  background-position: 100% 100%;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+
+.btn-mountain:active {
+  transform: translateY(0);
+}
+
+/* Ambient background stars */
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: white;
+  border-radius: 50%;
+  animation: starTwinkle ease-in-out infinite;
+}
+
+/* Choice button */
+.choice-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.choice-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transition: left 0.5s ease;
+}
+
+.choice-btn:hover::before {
+  left: 100%;
 }
