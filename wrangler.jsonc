@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "blood-battle-aotaixian",
+  "compatibility_date": "2026-06-25",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "game"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
