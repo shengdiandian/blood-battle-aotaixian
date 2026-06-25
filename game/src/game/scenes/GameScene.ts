@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { generateTerrainSprite, generateCharacterSprites, TERRAIN_MAP } from '../pixelArt'
+import { generateTerrainSprite, generateCharacterSprites, generateSnowParticle, generateRainDrop, TERRAIN_MAP } from '../pixelArt'
 
 export default class GameScene extends Phaser.Scene {
   private terrainSprite!: Phaser.GameObjects.Image
@@ -12,8 +12,6 @@ export default class GameScene extends Phaser.Scene {
   private isWalking = false
   private walkTargetX = 0
   private onMoveComplete?: () => void
-  private terrainType = 'stone'
-  private particleImages: { snow: Phaser.GameObjects.Image, rain: Phaser.GameObjects.Image } | null = null
 
   constructor() {
     super({ key: 'GameScene' })
@@ -22,10 +20,11 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale
 
-    // Generate terrain
-    this.terrainSprite = this.add.image(width / 2, height * 0.65, '__generated terrain')
+    // Generate terrain sprite
+    const terrainCanvas = generateTerrainSprite('stone')
+    this.textures.addCanvas('terrain_stone', terrainCanvas)
+    this.terrainSprite = this.add.image(width / 2, height * 0.65, 'terrain_stone')
     this.terrainSprite.setDisplaySize(width, height * 0.5)
-    this.terrainSprite.setOrigin(0.5, 0.5)
 
     // Generate character frames
     const charFrames = generateCharacterSprites()
@@ -39,7 +38,6 @@ export default class GameScene extends Phaser.Scene {
     })
 
     // Generate particle textures
-    const { generateSnowParticle, generateRainDrop } = require('../pixelArt')
     const snowCanvas = generateSnowParticle()
     const rainCanvas = generateRainDrop()
     this.textures.addCanvas('snow_particle', snowCanvas)
@@ -73,7 +71,7 @@ export default class GameScene extends Phaser.Scene {
       emitting: false,
     })
 
-    // Pixel-style title text
+    // Title
     this.add.text(width / 2, 30, '⛰ 鳌太线', {
       fontSize: '20px',
       fontFamily: 'monospace',
@@ -82,7 +80,6 @@ export default class GameScene extends Phaser.Scene {
       strokeThickness: 3,
     }).setOrigin(0.5)
 
-    // Subtitle
     this.add.text(width / 2, 55, '海拔 3400m · 危险等级 ★★★★★', {
       fontSize: '11px',
       fontFamily: 'monospace',
@@ -91,13 +88,13 @@ export default class GameScene extends Phaser.Scene {
   }
 
   setTerrain(type: string) {
-    this.terrainType = TERRAIN_MAP[type] || 'stone'
-    const canvas = generateTerrainSprite(this.terrainType)
-    const key = `terrain_${this.terrainType}`
-    if (!this.textures.exists(key)) {
-      this.textures.addCanvas(key, canvas)
+    const terrainKey = TERRAIN_MAP[type] || 'stone'
+    const texKey = `terrain_${terrainKey}`
+    if (!this.textures.exists(texKey)) {
+      const canvas = generateTerrainSprite(terrainKey)
+      this.textures.addCanvas(texKey, canvas)
     }
-    this.terrainSprite.setTexture(key)
+    this.terrainSprite.setTexture(texKey)
   }
 
   setWeather(weather: string) {
@@ -109,23 +106,22 @@ export default class GameScene extends Phaser.Scene {
 
     switch (weather) {
       case '暴风雪':
-        this.snowEmitter.emitting = true
+        this.snowEmitter.start()
         ;(this.snowEmitter as any).frequency = 30
         ;(this.snowEmitter as any).quantity = 4
         break
       case '冰雹':
-        this.snowEmitter.emitting = true
+        this.snowEmitter.start()
         ;(this.snowEmitter as any).frequency = 50
         ;(this.snowEmitter as any).quantity = 3
         break
       case '大雨':
       case '小雨':
-        this.rainEmitter.emitting = true
+        this.rainEmitter.start()
         ;(this.rainEmitter as any).frequency = weather === '大雨' ? 30 : 80
         break
     }
 
-    // Update sky color based on weather
     const bgColors: Record<string, number> = {
       '晴': 0x0f172a,
       '多云': 0x1a2230,
@@ -144,18 +140,16 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
-    // Character animation
     this.frameTimer += delta
     if (this.frameTimer > 200) {
       this.frameTimer = 0
-      this.characterFrames.forEach((f, i) => f.setVisible(false))
+      this.characterFrames.forEach(f => f.setVisible(false))
 
       if (this.isWalking) {
         this.currentFrame = (this.currentFrame + 1) % 3
         const char = this.characterFrames[this.currentFrame]
         char.setVisible(true)
 
-        // Move character
         const dx = this.walkTargetX - char.x
         if (Math.abs(dx) > 5) {
           char.x += Math.sign(dx) * 2
@@ -170,7 +164,6 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Idle breathing animation
     if (!this.isWalking) {
       const breath = Math.sin(Date.now() * 0.003) * 2
       this.characterFrames[0].y = this.scale.height * 0.58 + breath

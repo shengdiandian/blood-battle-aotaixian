@@ -9,6 +9,7 @@ export default function PixelGameCanvas() {
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<GameScene | null>(null)
   const state = useSnapshot(gameState)
+  const prevNode = useRef(state.currentNode)
 
   // Initialize Phaser
   useEffect(() => {
@@ -31,38 +32,49 @@ export default function PixelGameCanvas() {
     const game = new Phaser.Game(config)
     gameRef.current = game
 
-    game.events.once('ready', () => {
-      sceneRef.current = game.scene.getScene('GameScene') as GameScene
-    })
+    // Wait for scene to be ready
+    const checkScene = setInterval(() => {
+      const scene = game.scene.getScene('GameScene') as GameScene
+      if (scene && scene.scene.isActive()) {
+        sceneRef.current = scene
+        clearInterval(checkScene)
+        // Initial setup
+        const node = getCurrentNode()
+        scene.setTerrain(node.terrainType)
+        scene.setWeather(state.weather.condition)
+      }
+    }, 100)
 
     return () => {
+      clearInterval(checkScene)
       game.destroy(true)
       gameRef.current = null
+      sceneRef.current = null
     }
   }, [])
 
   // Update terrain when node changes
   useEffect(() => {
-    if (!sceneRef.current) return
+    const scene = sceneRef.current
+    if (!scene) return
     const node = getCurrentNode()
-    sceneRef.current.setTerrain(node.terrainType)
+    scene.setTerrain(node.terrainType)
+
+    // Walk animation on node change
+    if (prevNode.current !== state.currentNode) {
+      const { width } = scene.scale
+      const targetX = width * 0.3 + Math.random() * width * 0.4
+      scene.walkTo(targetX)
+    }
+    prevNode.current = state.currentNode
   }, [state.currentNode])
 
   // Update weather
   useEffect(() => {
-    if (!sceneRef.current) return
-    sceneRef.current.setWeather(state.weather.condition)
-  }, [state.weather.condition])
-
-  // Walk animation on node change
-  useEffect(() => {
-    if (!sceneRef.current) return
     const scene = sceneRef.current
-    const { width } = scene.scale
-    // Walk from left to a random position, then back
-    const targetX = width * 0.3 + Math.random() * width * 0.4
-    scene.walkTo(targetX)
-  }, [state.currentNode])
+    if (!scene) return
+    scene.setWeather(state.weather.condition)
+  }, [state.weather.condition])
 
   return (
     <div className="relative w-full" style={{ aspectRatio: '400/260' }}>
