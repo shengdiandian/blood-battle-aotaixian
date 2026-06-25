@@ -4,8 +4,9 @@ import StatusPanel from './components/StatusPanel'
 import GamePanel from './components/GamePanel'
 import GameMap from './components/GameMap'
 import EventLog from './components/EventLog'
+import PixelGameCanvas from './components/PixelGameCanvas'
 import { gameState } from './store/gameStore'
-import { Map, ScrollText, User, Mountain } from 'lucide-react'
+import { Map, ScrollText, User, Mountain, Gamepad2, Monitor } from 'lucide-react'
 
 function WeatherEffects() {
   const state = useSnapshot(gameState)
@@ -89,6 +90,7 @@ type MobileTab = 'game' | 'status' | 'map' | 'log'
 function App() {
   const state = useSnapshot(gameState)
   const [mobileTab, setMobileTab] = useState<MobileTab>('game')
+  const [pixelMode, setPixelMode] = useState(true)
 
   const sceneBg = useMemo(() => {
     const c = state.weather.condition
@@ -153,6 +155,17 @@ function App() {
           <StatusPanel />
         </div>
         <div className="flex-1 p-2 flex flex-col gap-2 min-w-0">
+          {/* Pixel game canvas + toggle */}
+          <div className="shrink-0 relative">
+            <PixelGameCanvas />
+            <button
+              onClick={() => setPixelMode(!pixelMode)}
+              className="absolute top-2 right-2 z-10 bg-mountain-900/80 backdrop-blur-sm rounded p-1.5 border border-mountain-700/50 text-mountain-400 hover:text-ice-400 transition-colors cursor-pointer"
+              title={pixelMode ? '切换文字模式' : '切换像素模式'}
+            >
+              {pixelMode ? <Monitor size={14} /> : <Gamepad2 size={14} />}
+            </button>
+          </div>
           <div className="flex-1 min-h-0">
             <GamePanel />
           </div>
@@ -168,7 +181,14 @@ function App() {
       {/* Mobile: tab-based layout */}
       <div className="flex md:hidden flex-1 flex-col overflow-hidden relative z-10">
         <div className="flex-1 overflow-y-auto">
-          {mobileTab === 'game' && <GamePanel />}
+          {mobileTab === 'game' && (
+            <>
+              <div className="p-2">
+                <PixelGameCanvas />
+              </div>
+              <GamePanel />
+            </>
+          )}
           {mobileTab === 'status' && <div className="p-2"><StatusPanel /></div>}
           {mobileTab === 'map' && <div className="h-full min-h-[50vh] p-2"><GameMap /></div>}
           {mobileTab === 'log' && <div className="p-2"><EventLog /></div>}
