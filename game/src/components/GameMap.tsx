@@ -1,100 +1,80 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useSnapshot } from 'valtio'
 import { gameState, getRouteNodes } from '../store/gameStore'
-import { Map, Mountain, AlertTriangle } from 'lucide-react'
+import { Map } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
 const terrainColors: Record<string, string> = {
-  '石海': '#94a3b8',
-  '草甸': '#4ade80',
-  '刃脊': '#f87171',
-  '丛林': '#22c55e',
-  '营地': '#fbbf24',
-  '村庄': '#a78bfa',
-  '湖泊': '#38bdf8',
-  '庙宇': '#c084fc',
+  '石海': '#94a3b8', '草甸': '#4ade80', '刃脊': '#f87171',
+  '丛林': '#22c55e', '营地': '#fbbf24', '村庄': '#a78bfa',
+  '湖泊': '#38bdf8', '庙宇': '#c084fc',
 }
 
-const terrainEmoji: Record<string, string> = {
-  '石海': '🪨',
-  '草甸': '🌿',
-  '刃脊': '🗡️',
-  '丛林': '🌲',
-  '营地': '⛺',
-  '村庄': '🏘️',
-  '湖泊': '💧',
-  '庙宇': '🛕',
-}
-
-function createNodeIcon(node: { name: string; terrainType: string; dangerLevel: number }, isVisited: boolean, isCurrent: boolean) {
-  const color = terrainColors[node.terrainType] || '#94a3b8'
-  const size = isCurrent ? 0 : isVisited ? 8 : 10
-  const opacity = isVisited ? '0.5' : '1'
-  const border = isVisited ? '1px' : '2px'
-  const shadow = node.dangerLevel >= 4 ? `box-shadow:0 0 6px ${color}80;` : ''
-
+function createDotIcon(color: string, size: number, glow: boolean) {
   return L.divIcon({
     html: `<div style="
       width:${size}px;height:${size}px;border-radius:50%;
-      background:${color};border:${border} solid ${isVisited ? '#1e293b' : '#0a0e17'};
-      opacity:${opacity};${shadow}
+      background:${color};border:2px solid #0a0e17;
+      ${glow ? `box-shadow:0 0 8px ${color}99;` : ''}
     "></div>`,
-    className: '',
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   })
 }
 
 function createCurrentIcon() {
   return L.divIcon({
     html: `<div style="
-      width:20px;height:20px;border-radius:50%;
+      width:18px;height:18px;border-radius:50%;
       background:linear-gradient(135deg,#38bdf8,#0ea5e9);
       border:3px solid #0a0e17;
-      box-shadow:0 0 16px rgba(56,189,248,0.8),0 0 30px rgba(56,189,248,0.3);
+      box-shadow:0 0 14px rgba(56,189,248,0.8);
       animation:pulseGlow 2s ease-in-out infinite;
     "></div>`,
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
+    className: '', iconSize: [18, 18], iconAnchor: [9, 9],
   })
 }
 
-function createLabelIcon(name: string, terrainType: string, isCurrent: boolean) {
+function createLabelWithLine(name: string, terrainType: string, isCurrent: boolean, above: boolean) {
   const color = terrainColors[terrainType] || '#94a3b8'
   const textColor = isCurrent ? '#38bdf8' : '#e2e8f0'
-  const bgOpacity = isCurrent ? '0.9' : '0.7'
+  const borderColor = isCurrent ? '#38bdf8' : color + '50'
+  const lineH = 20
 
-  return L.divIcon({
-    html: `<div style="
-      white-space:nowrap;font-size:10px;font-weight:bold;
-      color:${textColor};background:rgba(10,14,23,${bgOpacity});
-      padding:2px 5px;border-radius:3px;
-      border:1px solid ${isCurrent ? '#38bdf8' : color + '40'};
-      text-shadow:0 1px 2px rgba(0,0,0,0.8);
-      letter-spacing:0.5px;
-    ">${name}</div>`,
-    className: '',
-    iconSize: [0, 0],
-    iconAnchor: [-6, 6],
-  })
-}
-
-function createIncidentIcon() {
-  return L.divIcon({
-    html: `<div style="
-      width:10px;height:10px;border-radius:2px;
-      background:rgba(239,68,68,0.7);
-      border:1.5px solid rgba(252,165,165,0.6);
-      box-shadow:0 0 8px rgba(239,68,68,0.4);
-      transform:rotate(45deg);
-    "></div>`,
-    className: '',
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
-  })
+  if (above) {
+    return L.divIcon({
+      html: `<div style="display:flex;flex-direction:column;align-items:center;width:0;">
+        <div style="
+          white-space:nowrap;font-size:9px;font-weight:600;
+          color:${textColor};background:rgba(10,14,23,0.85);
+          padding:1px 4px;border-radius:3px;
+          border:1px solid ${borderColor};
+          text-shadow:0 1px 2px rgba(0,0,0,0.9);
+          letter-spacing:0.3px;
+          margin-bottom:2px;
+        ">${name}</div>
+        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.5;"></div>
+      </div>`,
+      className: '', iconSize: [0, 0], iconAnchor: [0, lineH + 2],
+    })
+  } else {
+    return L.divIcon({
+      html: `<div style="display:flex;flex-direction:column;align-items:center;width:0;">
+        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.5;"></div>
+        <div style="
+          white-space:nowrap;font-size:9px;font-weight:600;
+          color:${textColor};background:rgba(10,14,23,0.85);
+          padding:1px 4px;border-radius:3px;
+          border:1px solid ${borderColor};
+          text-shadow:0 1px 2px rgba(0,0,0,0.9);
+          letter-spacing:0.3px;
+          margin-top:2px;
+        ">${name}</div>
+      </div>`,
+      className: '', iconSize: [0, 0], iconAnchor: [0, 0],
+    })
+  }
 }
 
 function MapUpdater() {
@@ -102,14 +82,103 @@ function MapUpdater() {
   const state = useSnapshot(gameState)
   const nodes = getRouteNodes()
   const currentNode = nodes.find(n => n.id === state.currentNode)
-
   useEffect(() => {
-    if (currentNode) {
-      map.setView(currentNode.coordinates, 12, { animate: true, duration: 1 })
-    }
+    if (currentNode) map.setView(currentNode.coordinates, 11, { animate: true, duration: 1 })
   }, [currentNode, map])
-
   return null
+}
+
+function ElevationProfile() {
+  const state = useSnapshot(gameState)
+  const nodes = getRouteNodes()
+
+  const maxAlt = 3800
+  const minAlt = 1400
+  const w = 280
+  const h = 60
+  const pad = { top: 8, bottom: 16, left: 2, right: 2 }
+  const chartW = w - pad.left - pad.right
+  const chartH = h - pad.top - pad.bottom
+
+  const points = nodes.map((n, i) => {
+    const x = pad.left + (i / (nodes.length - 1)) * chartW
+    const y = pad.top + chartH - ((n.altitude - minAlt) / (maxAlt - minAlt)) * chartH
+    return { x, y, ...n }
+  })
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+  const areaD = pathD + ` L${points[points.length - 1].x},${h - pad.bottom} L${points[0].x},${h - pad.bottom} Z`
+
+  const currentIdx = nodes.findIndex(n => n.id === state.currentNode)
+  const currentX = currentIdx >= 0 ? points[currentIdx].x : 0
+  const currentY = currentIdx >= 0 ? points[currentIdx].y : 0
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-mountain-900/95 backdrop-blur border-t border-mountain-700/50">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: 60 }}>
+        {/* Grid lines */}
+        {[2000, 2500, 3000, 3500].map(alt => {
+          const y = pad.top + chartH - ((alt - minAlt) / (maxAlt - minAlt)) * chartH
+          return (
+            <g key={alt}>
+              <line x1={pad.left} y1={y} x2={w - pad.right} y2={y} stroke="#334155" strokeWidth="0.5" strokeDasharray="2,3" />
+              <text x={w - pad.right + 1} y={y + 3} fill="#64748b" fontSize="6" fontFamily="monospace">{alt}</text>
+            </g>
+          )
+        })}
+
+        {/* Area fill */}
+        <path d={areaD} fill="url(#elevGrad)" opacity="0.3" />
+
+        {/* Route line with altitude coloring */}
+        {points.slice(0, -1).map((p, i) => {
+          const next = points[i + 1]
+          const alt1 = nodes[i].altitude
+          const alt2 = nodes[i + 1].altitude
+          const avgAlt = (alt1 + alt2) / 2
+          const ratio = (avgAlt - minAlt) / (maxAlt - minAlt)
+          const r = Math.round(56 + ratio * 183)
+          const g = Math.round(189 - ratio * 120)
+          const b = Math.round(248 - ratio * 100)
+          return <line key={i} x1={p.x} y1={p.y} x2={next.x} y2={next.y} stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" opacity="0.8" />
+        })}
+
+        {/* Node dots */}
+        {points.map((p, i) => {
+          const isVisited = state.visitedNodes.includes(nodes[i].id)
+          const isCurrent = nodes[i].id === state.currentNode
+          const color = terrainColors[nodes[i].terrainType] || '#94a3b8'
+          return (
+            <circle
+              key={i} cx={p.x} cy={p.y}
+              r={isCurrent ? 3.5 : isVisited ? 2 : 2.5}
+              fill={isCurrent ? '#38bdf8' : isVisited ? '#475569' : color}
+              stroke="#0a0e17" strokeWidth={isCurrent ? 1.5 : 1}
+              opacity={isVisited ? 0.5 : 1}
+            />
+          )
+        })}
+
+        {/* Current position marker */}
+        {currentIdx >= 0 && (
+          <g>
+            <line x1={currentX} y1={currentY - 3} x2={currentX} y2={h - pad.bottom} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
+          </g>
+        )}
+
+        {/* Start/End labels */}
+        <text x={pad.left} y={h - 3} fill="#94a3b8" fontSize="6" fontFamily="sans-serif">塘口村</text>
+        <text x={w - pad.right} y={h - 3} fill="#94a3b8" fontSize="6" fontFamily="sans-serif" textAnchor="end">南塬村</text>
+
+        <defs>
+          <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  )
 }
 
 export default function GameMap() {
@@ -123,24 +192,20 @@ export default function GameMap() {
     { name: '麦秸岭', coords: [107.86, 33.79] as [number, number], count: 3 },
     { name: '飞机梁', coords: [107.92, 33.76] as [number, number], count: 4 },
     { name: '太白梁', coords: [108.04, 33.69] as [number, number], count: 2 },
-    { name: '水窝子营地', coords: [107.88, 33.78] as [number, number], count: 2 },
     { name: '导航架', coords: [107.83, 33.81] as [number, number], count: 2 },
     { name: '万仙阵', coords: [108.10, 33.66] as [number, number], count: 2 },
-    { name: '金字塔', coords: [107.99, 33.71] as [number, number], count: 1 },
   ]
 
   const currentNode = nodes.find(n => n.id === state.currentNode)
 
   return (
     <div className="bg-mountain-800/80 backdrop-blur rounded-lg border border-mountain-700/60 h-full overflow-hidden card-atmosphere flex flex-col">
-      <div className="p-2.5 border-b border-mountain-700/50 flex items-center gap-2">
+      <div className="p-2.5 border-b border-mountain-700/50 flex items-center gap-2 shrink-0">
         <Map size={13} className="text-mountain-400" />
         <h3 className="text-xs font-bold text-mountain-400 tracking-wider uppercase">路线图</h3>
-        {currentNode && (
-          <span className="text-xs text-ice-400 ml-auto">{currentNode.name}</span>
-        )}
+        {currentNode && <span className="text-xs text-ice-400 ml-auto">{currentNode.name}</span>}
       </div>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" style={{ marginBottom: 60 }}>
         <MapContainer
           center={currentNode?.coordinates || [107.85, 33.80]}
           zoom={11}
@@ -149,61 +214,41 @@ export default function GameMap() {
           zoomControl={false}
           attributionControl={false}
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          />
+          <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
           <MapUpdater />
 
-          {/* Route line - thicker, gradient-like */}
-          <Polyline
-            positions={routeCoords}
-            pathOptions={{
-              color: '#38bdf8',
-              weight: 2,
-              dashArray: '6,4',
-              opacity: 0.35,
-            }}
-          />
+          {/* Route line */}
+          <Polyline positions={routeCoords} pathOptions={{ color: '#38bdf8', weight: 1.5, dashArray: '5,4', opacity: 0.3 }} />
 
-          {/* Node labels - shown on all nodes */}
-          {nodes.map(node => (
-            <Marker
-              key={`label-${node.id}`}
-              position={node.coordinates}
-              icon={createLabelIcon(
-                node.name,
-                node.terrainType,
-                node.id === state.currentNode
-              )}
-              interactive={false}
-            />
-          ))}
+          {/* Labels with leader lines - alternate above/below */}
+          {nodes.map((node, i) => {
+            const isCurrent = node.id === state.currentNode
+            return (
+              <Marker
+                key={`label-${node.id}`}
+                position={node.coordinates}
+                icon={createLabelWithLine(node.name, node.terrainType, isCurrent, i % 2 === 0)}
+                interactive={false}
+              />
+            )
+          })}
 
           {/* Node dots */}
           {nodes.map(node => {
             const isVisited = state.visitedNodes.includes(node.id)
             const isCurrent = node.id === state.currentNode
+            const color = terrainColors[node.terrainType] || '#94a3b8'
             return (
-              <Marker
-                key={node.id}
-                position={node.coordinates}
-                icon={createNodeIcon(node, isVisited, isCurrent)}
-              >
+              <Marker key={node.id} position={node.coordinates} icon={createDotIcon(isCurrent ? '#38bdf8' : color, isVisited ? 6 : 8, node.dangerLevel >= 4)}>
                 <Popup className="custom-popup">
                   <div className="text-xs p-1 min-w-[120px]">
-                    <div className="font-bold text-slate-800 text-sm mb-1">
-                      {terrainEmoji[node.terrainType]} {node.name}
-                    </div>
+                    <div className="font-bold text-slate-800 text-sm mb-1">{node.name}</div>
                     <div className="text-slate-600 space-y-0.5">
-                      <div>海拔: {node.altitude}m</div>
-                      <div>距离: {node.distance}km</div>
-                      <div>地形: {node.terrainType}</div>
-                      <div className="flex items-center gap-1">
-                        危险:
-                        <span style={{ color: node.dangerLevel >= 4 ? '#ef4444' : node.dangerLevel >= 3 ? '#f59e0b' : '#22c55e' }}>
-                          {'★'.repeat(node.dangerLevel)}{'☆'.repeat(5 - node.dangerLevel)}
-                        </span>
-                      </div>
+                      <div>海拔 {node.altitude}m · {node.distance}km</div>
+                      <div>地形 {node.terrainType}</div>
+                      <div>危险 <span style={{ color: node.dangerLevel >= 4 ? '#ef4444' : node.dangerLevel >= 3 ? '#f59e0b' : '#22c55e' }}>
+                        {'★'.repeat(node.dangerLevel)}{'☆'.repeat(5 - node.dangerLevel)}
+                      </span></div>
                     </div>
                   </div>
                 </Popup>
@@ -211,63 +256,30 @@ export default function GameMap() {
             )
           })}
 
-          {/* Current position - larger, glowing */}
+          {/* Current position */}
           {currentNode && (
             <Marker position={currentNode.coordinates} icon={createCurrentIcon()}>
               <Popup>
-                <div className="text-xs p-1 min-w-[120px]">
-                  <div className="font-bold text-slate-800 text-sm mb-1">
-                    📍 {currentNode.name}
-                  </div>
-                  <div className="text-slate-600">你当前的位置</div>
-                </div>
+                <div className="text-xs p-1"><strong className="text-slate-800">📍 {currentNode.name}</strong></div>
               </Popup>
             </Marker>
           )}
 
-          {/* Incident markers - rotated squares */}
+          {/* Incidents */}
           {incidentLocations.map((loc, i) => (
-            <Marker key={`inc_${i}`} position={loc.coords} icon={createIncidentIcon()}>
+            <Marker key={`inc_${i}`} position={loc.coords} icon={createDotIcon('#ef4444', 8, true)}>
               <Popup>
-                <div className="text-xs p-1 min-w-[120px]">
-                  <div className="font-bold text-red-700 text-sm mb-1">⚠ {loc.name}</div>
-                  <div className="text-slate-600">此处发生过 {loc.count} 起事故</div>
+                <div className="text-xs p-1">
+                  <strong className="text-red-700">⚠ {loc.name}</strong><br />
+                  <span className="text-slate-600">此处发生过 {loc.count} 起事故</span>
                 </div>
               </Popup>
             </Marker>
           ))}
         </MapContainer>
 
-        {/* Legend overlay */}
-        <div className="absolute bottom-2 left-2 bg-mountain-900/90 backdrop-blur rounded-md p-2 border border-mountain-700/50 z-[1000]">
-          <div className="text-xs text-mountain-400 mb-1 font-bold">图例</div>
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-mountain-900" />
-              <span>当前位置</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2 h-2 rounded-full bg-amber-400 border border-mountain-900" />
-              <span>营地</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2 h-2 rounded-full bg-red-400 border border-mountain-900" />
-              <span>刃脊</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2 h-2 rounded-full bg-slate-400 border border-mountain-900" />
-              <span>石海</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 border border-mountain-900" />
-              <span>草甸</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-mountain-300">
-              <div className="w-2.5 h-2.5 rotate-45 bg-red-500/70 border border-red-300/60" />
-              <span>事故点</span>
-            </div>
-          </div>
-        </div>
+        {/* Elevation profile at bottom */}
+        <ElevationProfile />
       </div>
     </div>
   )
