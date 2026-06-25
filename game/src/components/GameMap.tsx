@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useSnapshot } from 'valtio'
@@ -40,7 +40,7 @@ function createLabelWithLine(name: string, terrainType: string, isCurrent: boole
   const color = terrainColors[terrainType] || '#94a3b8'
   const textColor = isCurrent ? '#38bdf8' : '#e2e8f0'
   const borderColor = isCurrent ? '#38bdf8' : color + '50'
-  const lineH = 20
+  const lineH = 18
 
   if (above) {
     return L.divIcon({
@@ -51,24 +51,22 @@ function createLabelWithLine(name: string, terrainType: string, isCurrent: boole
           padding:1px 4px;border-radius:3px;
           border:1px solid ${borderColor};
           text-shadow:0 1px 2px rgba(0,0,0,0.9);
-          letter-spacing:0.3px;
           margin-bottom:2px;
         ">${name}</div>
-        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.5;"></div>
+        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.4;"></div>
       </div>`,
       className: '', iconSize: [0, 0], iconAnchor: [0, lineH + 2],
     })
   } else {
     return L.divIcon({
       html: `<div style="display:flex;flex-direction:column;align-items:center;width:0;">
-        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.5;"></div>
+        <div style="width:1px;height:${lineH}px;background:${borderColor};opacity:0.4;"></div>
         <div style="
           white-space:nowrap;font-size:9px;font-weight:600;
           color:${textColor};background:rgba(10,14,23,0.85);
           padding:1px 4px;border-radius:3px;
           border:1px solid ${borderColor};
           text-shadow:0 1px 2px rgba(0,0,0,0.9);
-          letter-spacing:0.3px;
           margin-top:2px;
         ">${name}</div>
       </div>`,
@@ -88,26 +86,45 @@ function MapUpdater() {
   return null
 }
 
-function ElevationProfile() {
+function MountainProfile() {
   const state = useSnapshot(gameState)
   const nodes = getRouteNodes()
 
   const maxAlt = 3800
   const minAlt = 1400
-  const w = 280
-  const h = 60
-  const pad = { top: 8, bottom: 16, left: 2, right: 2 }
-  const chartW = w - pad.left - pad.right
-  const chartH = h - pad.top - pad.bottom
+  const w = 300
+  const h = 110
+  const base = h - 18
+  const chartH = base - 10
 
   const points = nodes.map((n, i) => {
-    const x = pad.left + (i / (nodes.length - 1)) * chartW
-    const y = pad.top + chartH - ((n.altitude - minAlt) / (maxAlt - minAlt)) * chartH
-    return { x, y, ...n }
+    const x = 10 + (i / (nodes.length - 1)) * (w - 20)
+    const altRatio = (n.altitude - minAlt) / (maxAlt - minAlt)
+    const y = base - altRatio * chartH
+    return { x, y, altitude: n.altitude, name: n.name }
   })
 
-  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
-  const areaD = pathD + ` L${points[points.length - 1].x},${h - pad.bottom} L${points[0].x},${h - pad.bottom} Z`
+  // Build smooth mountain silhouette path
+  let mountainPath = `M${points[0].x},${base}`
+  // Start with a slope up to first point
+  mountainPath += ` L${points[0].x},${points[0].y}`
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const cpx = (prev.x + curr.x) / 2
+    mountainPath += ` Q${prev.x + (curr.x - prev.x) * 0.3},${prev.y} ${cpx},${(prev.y + curr.y) / 2}`
+    mountainPath += ` Q${prev.x + (curr.x - prev.x) * 0.7},${curr.y} ${curr.x},${curr.y}`
+  }
+  mountainPath += ` L${points[points.length - 1].x},${base} Z`
+
+  // Snow cap path (only for peaks above 3200m)
+  let snowPath = ''
+  for (const p of points) {
+    if (p.altitude >= 3200) {
+      const snowH = Math.min(12, (p.altitude - 3200) / 100 + 4)
+      snowPath += `M${p.x - 4},${p.y + 2} L${p.x},${p.y - snowH * 0.3} L${p.x + 4},${p.y + 2} `
+    }
+  }
 
   const currentIdx = nodes.findIndex(n => n.id === state.currentNode)
   const currentX = currentIdx >= 0 ? points[currentIdx].x : 0
@@ -115,35 +132,48 @@ function ElevationProfile() {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-mountain-900/95 backdrop-blur border-t border-mountain-700/50">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: 60 }}>
-        {/* Grid lines */}
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: 100 }}>
+        <defs>
+          <linearGradient id="mtnGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.15" />
+            <stop offset="40%" stopColor="#1e293b" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#0a0e17" stopOpacity="0.8" />
+          </linearGradient>
+          <linearGradient id="snowGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Altitude grid lines */}
         {[2000, 2500, 3000, 3500].map(alt => {
-          const y = pad.top + chartH - ((alt - minAlt) / (maxAlt - minAlt)) * chartH
+          const y = base - ((alt - minAlt) / (maxAlt - minAlt)) * chartH
           return (
             <g key={alt}>
-              <line x1={pad.left} y1={y} x2={w - pad.right} y2={y} stroke="#334155" strokeWidth="0.5" strokeDasharray="2,3" />
-              <text x={w - pad.right + 1} y={y + 3} fill="#64748b" fontSize="6" fontFamily="monospace">{alt}</text>
+              <line x1="10" y1={y} x2={w - 10} y2={y} stroke="#1e293b" strokeWidth="0.5" strokeDasharray="2,4" />
+              <text x={w - 8} y={y + 3} fill="#475569" fontSize="5.5" fontFamily="monospace">{alt}</text>
             </g>
           )
         })}
 
-        {/* Area fill */}
-        <path d={areaD} fill="url(#elevGrad)" opacity="0.3" />
+        {/* Mountain body - dark fill */}
+        <path d={mountainPath} fill="url(#mtnGrad)" />
 
-        {/* Route line with altitude coloring */}
+        {/* Mountain ridge line */}
         {points.slice(0, -1).map((p, i) => {
           const next = points[i + 1]
-          const alt1 = nodes[i].altitude
-          const alt2 = nodes[i + 1].altitude
-          const avgAlt = (alt1 + alt2) / 2
+          const avgAlt = (nodes[i].altitude + nodes[i + 1].altitude) / 2
           const ratio = (avgAlt - minAlt) / (maxAlt - minAlt)
           const r = Math.round(56 + ratio * 183)
           const g = Math.round(189 - ratio * 120)
           const b = Math.round(248 - ratio * 100)
-          return <line key={i} x1={p.x} y1={p.y} x2={next.x} y2={next.y} stroke={`rgb(${r},${g},${b})`} strokeWidth="1.5" opacity="0.8" />
+          return <line key={i} x1={p.x} y1={p.y} x2={next.x} y2={next.y} stroke={`rgb(${r},${g},${b})`} strokeWidth="1.2" opacity="0.7" />
         })}
 
-        {/* Node dots */}
+        {/* Snow caps */}
+        {snowPath && <path d={snowPath} fill="url(#snowGrad)" />}
+
+        {/* Node dots on mountain */}
         {points.map((p, i) => {
           const isVisited = state.visitedNodes.includes(nodes[i].id)
           const isCurrent = nodes[i].id === state.currentNode
@@ -151,31 +181,22 @@ function ElevationProfile() {
           return (
             <circle
               key={i} cx={p.x} cy={p.y}
-              r={isCurrent ? 3.5 : isVisited ? 2 : 2.5}
+              r={isCurrent ? 3 : isVisited ? 1.5 : 2}
               fill={isCurrent ? '#38bdf8' : isVisited ? '#475569' : color}
-              stroke="#0a0e17" strokeWidth={isCurrent ? 1.5 : 1}
+              stroke="#0a0e17" strokeWidth={isCurrent ? 1.5 : 0.8}
               opacity={isVisited ? 0.5 : 1}
             />
           )
         })}
 
-        {/* Current position marker */}
+        {/* Current position vertical line */}
         {currentIdx >= 0 && (
-          <g>
-            <line x1={currentX} y1={currentY - 3} x2={currentX} y2={h - pad.bottom} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
-          </g>
+          <line x1={currentX} y1={currentY - 4} x2={currentX} y2={base} stroke="#38bdf8" strokeWidth="0.5" strokeDasharray="1,2" opacity="0.4" />
         )}
 
         {/* Start/End labels */}
-        <text x={pad.left} y={h - 3} fill="#94a3b8" fontSize="6" fontFamily="sans-serif">塘口村</text>
-        <text x={w - pad.right} y={h - 3} fill="#94a3b8" fontSize="6" fontFamily="sans-serif" textAnchor="end">南塬村</text>
-
-        <defs>
-          <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-          </linearGradient>
-        </defs>
+        <text x="10" y={base + 10} fill="#64748b" fontSize="5.5" fontFamily="sans-serif">塘口村</text>
+        <text x={w - 10} y={base + 10} fill="#64748b" fontSize="5.5" fontFamily="sans-serif" textAnchor="end">南塬村</text>
       </svg>
     </div>
   )
@@ -205,7 +226,7 @@ export default function GameMap() {
         <h3 className="text-xs font-bold text-mountain-400 tracking-wider uppercase">路线图</h3>
         {currentNode && <span className="text-xs text-ice-400 ml-auto">{currentNode.name}</span>}
       </div>
-      <div className="flex-1 relative" style={{ marginBottom: 60 }}>
+      <div className="flex-1 relative" style={{ marginBottom: 100 }}>
         <MapContainer
           center={currentNode?.coordinates || [107.85, 33.80]}
           zoom={11}
@@ -216,22 +237,17 @@ export default function GameMap() {
         >
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
           <MapUpdater />
-
-          {/* Route line */}
           <Polyline positions={routeCoords} pathOptions={{ color: '#38bdf8', weight: 1.5, dashArray: '5,4', opacity: 0.3 }} />
 
-          {/* Labels with leader lines - alternate above/below */}
-          {nodes.map((node, i) => {
-            const isCurrent = node.id === state.currentNode
-            return (
-              <Marker
-                key={`label-${node.id}`}
-                position={node.coordinates}
-                icon={createLabelWithLine(node.name, node.terrainType, isCurrent, i % 2 === 0)}
-                interactive={false}
-              />
-            )
-          })}
+          {/* Labels with leader lines */}
+          {nodes.map((node, i) => (
+            <Marker
+              key={`label-${node.id}`}
+              position={node.coordinates}
+              icon={createLabelWithLine(node.name, node.terrainType, node.id === state.currentNode, i % 2 === 0)}
+              interactive={false}
+            />
+          ))}
 
           {/* Node dots */}
           {nodes.map(node => {
@@ -256,16 +272,12 @@ export default function GameMap() {
             )
           })}
 
-          {/* Current position */}
           {currentNode && (
             <Marker position={currentNode.coordinates} icon={createCurrentIcon()}>
-              <Popup>
-                <div className="text-xs p-1"><strong className="text-slate-800">📍 {currentNode.name}</strong></div>
-              </Popup>
+              <Popup><div className="text-xs p-1"><strong className="text-slate-800">📍 {currentNode.name}</strong></div></Popup>
             </Marker>
           )}
 
-          {/* Incidents */}
           {incidentLocations.map((loc, i) => (
             <Marker key={`inc_${i}`} position={loc.coords} icon={createDotIcon('#ef4444', 8, true)}>
               <Popup>
@@ -278,8 +290,7 @@ export default function GameMap() {
           ))}
         </MapContainer>
 
-        {/* Elevation profile at bottom */}
-        <ElevationProfile />
+        <MountainProfile />
       </div>
     </div>
   )

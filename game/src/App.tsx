@@ -167,11 +167,11 @@ function App() {
 
       {/* Mobile: tab-based layout */}
       <div className="flex md:hidden flex-1 flex-col overflow-hidden relative z-10">
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto">
           {mobileTab === 'game' && <GamePanel />}
-          {mobileTab === 'status' && <StatusPanel />}
-          {mobileTab === 'map' && <div className="h-full min-h-[50vh]"><GameMap /></div>}
-          {mobileTab === 'log' && <EventLog />}
+          {mobileTab === 'status' && <div className="p-2"><StatusPanel /></div>}
+          {mobileTab === 'map' && <div className="h-full min-h-[50vh] p-2"><GameMap /></div>}
+          {mobileTab === 'log' && <div className="p-2"><EventLog /></div>}
         </div>
 
         {/* Mobile tab bar */}

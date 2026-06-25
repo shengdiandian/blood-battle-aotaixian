@@ -101,18 +101,18 @@ export default function GamePanel() {
       </div>
 
       {/* Narrative text - the story */}
-      <div className="flex-1 p-5 overflow-y-auto">
+      <div className="flex-1 p-4 sm:p-5 overflow-y-auto">
         <div className="story-text text-mountain-200 text-sm">
           {currentNode.description}
         </div>
 
         {/* Altitude indicator */}
-        <div className="mt-4 relative">
+        <div className="mt-3 relative">
           <div className="flex items-center gap-2 text-xs text-mountain-500">
             <Moon size={12} />
             <span>路线进度</span>
           </div>
-          <div className="mt-2 h-1.5 bg-mountain-700 rounded-full overflow-hidden">
+          <div className="mt-1.5 h-1.5 bg-mountain-700 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-ice-500 to-ice-400"
               style={{ width: `${state.progress}%` }}
@@ -125,12 +125,12 @@ export default function GamePanel() {
           </div>
         </div>
 
-        {/* Recent narrative logs */}
-        <div className="mt-4 space-y-1">
-          {state.log.slice(-5).map(entry => (
+        {/* Recent narrative logs - fewer on mobile */}
+        <div className="mt-3 space-y-1">
+          {state.log.slice(-3).map(entry => (
             <div
               key={entry.id}
-              className={`text-xs py-1.5 px-3 rounded-r-md border-l-2 ${
+              className={`text-xs py-1 px-2.5 rounded-r-md border-l-2 ${
                 entry.type === 'danger' ? 'bg-danger-500/8 text-danger-400 border-danger-500/40' :
                 entry.type === 'warning' ? 'bg-warning-500/8 text-warning-400 border-warning-500/40' :
                 entry.type === 'success' ? 'bg-success-500/8 text-success-400 border-success-500/40' :
@@ -145,24 +145,24 @@ export default function GamePanel() {
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="p-4 border-t border-mountain-700/50">
+      {/* Action buttons - sticky on mobile */}
+      <div className="p-3 sm:p-4 border-t border-mountain-700/50 shrink-0 bg-mountain-800/95 backdrop-blur">
         {/* Direction choices */}
         {nextNodes.length > 0 && (
-          <div className="mb-3">
-            <h3 className="text-xs font-bold text-mountain-400 mb-2 tracking-wider uppercase">选择方向</h3>
-            <div className="flex flex-wrap gap-2">
+          <div className="mb-2">
+            <h3 className="text-xs font-bold text-mountain-400 mb-1.5 tracking-wider uppercase">选择方向</h3>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-2">
               {nextNodes.map(node => {
                 const nd = dangerLabel(node.dangerLevel)
                 return (
                   <button
                     key={node.id}
                     onClick={() => handleMove(node.id)}
-                    className="choice-btn flex items-center gap-2 px-4 py-2.5 bg-mountain-700/60 hover:bg-mountain-600/80
+                    className="choice-btn flex items-center gap-2 px-3 py-2.5 sm:py-2 bg-mountain-700/60 hover:bg-mountain-600/80
                       border border-mountain-600/50 hover:border-ice-500/40 rounded-lg text-sm text-mountain-100
-                      transition-all duration-200 cursor-pointer group"
+                      transition-all duration-200 cursor-pointer group active:scale-[0.98]"
                   >
-                    <ArrowRight size={14} className="text-mountain-400 group-hover:text-ice-400 transition-colors" />
+                    <ArrowRight size={14} className="text-mountain-400 group-hover:text-ice-400 transition-colors shrink-0" />
                     <span className="group-hover:text-white transition-colors">{node.name}</span>
                     <span className="text-xs text-mountain-500">{node.altitude}m</span>
                     <span className={`text-xs ${nd.color}`}>{nd.text}</span>
@@ -170,6 +170,38 @@ export default function GamePanel() {
                 )
               })}
             </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          <button
+            onClick={makeCamp}
+            disabled={!state.inventory.tent}
+            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
+              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
+              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100 active:scale-[0.97]"
+          >
+            <Tent size={13} /> 扎营
+          </button>
+          <button
+            onClick={eatAndDrink}
+            disabled={state.inventory.food <= 0 && state.inventory.water <= 0}
+            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
+              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
+              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100 active:scale-[0.97]"
+          >
+            <UtensilsCrossed size={13} /> 进食
+          </button>
+          <button
+            onClick={useFirstAid}
+            disabled={!state.inventory.firstAidKit}
+            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
+              border border-mountain-600/50 rounded-md text-xs text-mountain-300 transition-all
+              disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:text-mountain-100 active:scale-[0.97]"
+          >
+            <Heart size={13} /> 急救
+          </button>
+        </div>
           </div>
         )}
 
