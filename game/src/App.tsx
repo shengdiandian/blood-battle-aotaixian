@@ -1,10 +1,11 @@
 import { useSnapshot } from 'valtio'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import StatusPanel from './components/StatusPanel'
 import GamePanel from './components/GamePanel'
 import GameMap from './components/GameMap'
 import EventLog from './components/EventLog'
 import { gameState } from './store/gameStore'
+import { Map, ScrollText, User, Mountain } from 'lucide-react'
 
 function WeatherEffects() {
   const state = useSnapshot(gameState)
@@ -42,22 +43,14 @@ function WeatherEffects() {
         <div
           key={p.id}
           className={`snow-particle ${p.isStrong ? 'strong' : ''}`}
-          style={{
-            left: p.left,
-            animationDelay: p.delay,
-            animationDuration: p.duration,
-          }}
+          style={{ left: p.left, animationDelay: p.delay, animationDuration: p.duration }}
         />
       ))}
       {rainParticles.map(p => (
         <div
           key={`rain-${p.id}`}
           className="rain-particle"
-          style={{
-            left: p.left,
-            animationDelay: p.delay,
-            animationDuration: p.duration,
-          }}
+          style={{ left: p.left, animationDelay: p.delay, animationDuration: p.duration }}
         />
       ))}
       {showFog && <div className="fog-layer" />}
@@ -84,22 +77,18 @@ function StarField() {
         <div
           key={s.id}
           className="star"
-          style={{
-            left: s.left,
-            top: s.top,
-            width: s.size,
-            height: s.size,
-            animationDelay: s.delay,
-            animationDuration: s.duration,
-          }}
+          style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: s.delay, animationDuration: s.duration }}
         />
       ))}
     </div>
   )
 }
 
+type MobileTab = 'game' | 'status' | 'map' | 'log'
+
 function App() {
   const state = useSnapshot(gameState)
+  const [mobileTab, setMobileTab] = useState<MobileTab>('game')
 
   const sceneBg = useMemo(() => {
     const c = state.weather.condition
@@ -123,15 +112,15 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen ${sceneBg} flex flex-col relative overflow-hidden transition-all duration-1000`}>
+    <div className={`h-dvh ${sceneBg} flex flex-col relative overflow-hidden transition-all duration-1000`}>
       <StarField />
       <WeatherEffects />
 
       {/* Top navigation */}
-      <header className="h-11 border-b border-mountain-700/60 flex items-center px-5 relative z-10 backdrop-blur-sm bg-mountain-900/40">
+      <header className="h-11 border-b border-mountain-700/60 flex items-center px-3 sm:px-5 relative z-10 backdrop-blur-sm bg-mountain-900/40 shrink-0">
         <h1 className="text-sm font-bold text-mountain-100 tracking-wide">血战鳌太线</h1>
-        <div className="ml-4 h-4 w-px bg-mountain-600" />
-        <span className="ml-4 text-xs text-mountain-400 tracking-wider">
+        <div className="ml-3 h-4 w-px bg-mountain-600 hidden sm:block" />
+        <span className="ml-3 text-xs text-mountain-400 tracking-wider hidden sm:inline">
           {state.weather.condition === '晴' && '☀'}
           {state.weather.condition === '多云' && '☁'}
           {state.weather.condition === '雾' && '🌫'}
@@ -145,16 +134,24 @@ function App() {
           {' · '}
           已行进 {getCurrentDistance(state)}km
         </span>
+        {/* Mobile: compact info */}
+        <span className="ml-auto text-xs text-mountain-400 sm:hidden">
+          {state.weather.condition === '晴' && '☀'}
+          {state.weather.condition === '多云' && '☁'}
+          {state.weather.condition === '雾' && '🌫'}
+          {state.weather.condition === '小雨' && '🌧'}
+          {state.weather.condition === '大雨' && '🌧'}
+          {state.weather.condition === '暴风雪' && '❄'}
+          {state.weather.condition === '冰雹' && '🧊'}
+          {' '}{state.weather.temperature}°C
+        </span>
       </header>
 
-      {/* Main three-column layout */}
-      <div className="flex-1 flex overflow-hidden relative z-10">
-        {/* Left: Status Panel */}
+      {/* Desktop: three-column layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden relative z-10">
         <div className="w-56 shrink-0 p-2 overflow-y-auto">
           <StatusPanel />
         </div>
-
-        {/* Center: Game Area */}
         <div className="flex-1 p-2 flex flex-col gap-2 min-w-0">
           <div className="flex-1 min-h-0">
             <GamePanel />
@@ -163,10 +160,39 @@ function App() {
             <EventLog />
           </div>
         </div>
-
-        {/* Right: Map */}
         <div className="w-72 shrink-0 p-2">
           <GameMap />
+        </div>
+      </div>
+
+      {/* Mobile: tab-based layout */}
+      <div className="flex md:hidden flex-1 flex-col overflow-hidden relative z-10">
+        <div className="flex-1 overflow-y-auto p-2">
+          {mobileTab === 'game' && <GamePanel />}
+          {mobileTab === 'status' && <StatusPanel />}
+          {mobileTab === 'map' && <div className="h-full min-h-[50vh]"><GameMap /></div>}
+          {mobileTab === 'log' && <EventLog />}
+        </div>
+
+        {/* Mobile tab bar */}
+        <div className="shrink-0 border-t border-mountain-700/60 bg-mountain-900/80 backdrop-blur flex">
+          {([
+            { id: 'game' as MobileTab, icon: Mountain, label: '探索' },
+            { id: 'status' as MobileTab, icon: User, label: '状态' },
+            { id: 'log' as MobileTab, icon: ScrollText, label: '日志' },
+            { id: 'map' as MobileTab, icon: Map, label: '地图' },
+          ]).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileTab(tab.id)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors cursor-pointer ${
+                mobileTab === tab.id ? 'text-ice-400' : 'text-mountain-500'
+              }`}
+            >
+              <tab.icon size={18} />
+              <span className="text-xs">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -175,34 +201,20 @@ function App() {
 
 function getCurrentDistance(state: any) {
   const routeNodes = [
-    { id: 'tangkou', distance: 0 },
-    { id: 'camp2900', distance: 8 },
-    { id: 'penjingyuan', distance: 12 },
-    { id: 'baiqimiao', distance: 14 },
-    { id: 'daohangjia', distance: 18 },
-    { id: 'yaowangdong', distance: 20 },
-    { id: 'maijiling', distance: 24 },
-    { id: 'shuiwozi', distance: 28 },
-    { id: 'jinnianbei', distance: 30 },
-    { id: 'feijiliang', distance: 35 },
-    { id: 'liang1', distance: 37 },
-    { id: 'liang2', distance: 39 },
-    { id: 'liang3', distance: 41 },
-    { id: 'camp2800', distance: 45 },
-    { id: 'jinzita', distance: 50 },
-    { id: 'xiyuan', distance: 55 },
-    { id: 'taibailiang', distance: 60 },
-    { id: 'dashiehe', distance: 65 },
-    { id: 'dongyuan', distance: 70 },
-    { id: 'wanxianzhen', distance: 75 },
-    { id: 'leigongmiao', distance: 78 },
-    { id: 'dongpaomaliang', distance: 82 },
-    { id: 'dayehai', distance: 88 },
-    { id: 'baxiantai', distance: 92 },
-    { id: 'dawengongmiao', distance: 96 },
-    { id: 'fangyangsi', distance: 100 },
-    { id: 'mingxingsi', distance: 105 },
-    { id: 'pingansi', distance: 110 },
+    { id: 'tangkou', distance: 0 }, { id: 'camp2900', distance: 8 },
+    { id: 'penjingyuan', distance: 12 }, { id: 'baiqimiao', distance: 14 },
+    { id: 'daohangjia', distance: 18 }, { id: 'yaowangdong', distance: 20 },
+    { id: 'maijiling', distance: 24 }, { id: 'shuiwozi', distance: 28 },
+    { id: 'jinnianbei', distance: 30 }, { id: 'feijiliang', distance: 35 },
+    { id: 'liang1', distance: 37 }, { id: 'liang2', distance: 39 },
+    { id: 'liang3', distance: 41 }, { id: 'camp2800', distance: 45 },
+    { id: 'jinzita', distance: 50 }, { id: 'xiyuan', distance: 55 },
+    { id: 'taibailiang', distance: 60 }, { id: 'dashiehe', distance: 65 },
+    { id: 'dongyuan', distance: 70 }, { id: 'wanxianzhen', distance: 75 },
+    { id: 'leigongmiao', distance: 78 }, { id: 'dongpaomaliang', distance: 82 },
+    { id: 'dayehai', distance: 88 }, { id: 'baxiantai', distance: 92 },
+    { id: 'dawengongmiao', distance: 96 }, { id: 'fangyangsi', distance: 100 },
+    { id: 'mingxingsi', distance: 105 }, { id: 'pingansi', distance: 110 },
     { id: 'nanyuan', distance: 120 },
   ]
   const node = routeNodes.find(n => n.id === state.currentNode)
