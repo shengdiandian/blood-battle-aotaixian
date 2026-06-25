@@ -17,11 +17,10 @@ export default function PixelGame() {
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
       parent: containerRef.current,
-      width: 640,
-      height: 360,
+      width: 480,
+      height: 320,
       backgroundColor: '#0f172a',
       pixelArt: true,
-      physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false } },
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -40,6 +39,9 @@ export default function PixelGame() {
         const node = getCurrentNode()
         scene.setTerrain(node.terrainType)
         scene.setWeather(state.weather.condition)
+        scene.onInteract = () => {
+          // Trigger interaction in game state
+        }
       }
     }, 100)
 
@@ -57,8 +59,7 @@ export default function PixelGame() {
     const node = getCurrentNode()
     scene.setTerrain(node.terrainType)
     if (prevNode.current !== state.currentNode) {
-      // Flash transition
-      scene.cameras.main.flash(300, 0, 0, 0)
+      scene.cameras.main.flash(400, 0, 0, 0)
     }
     prevNode.current = state.currentNode
   }, [state.currentNode])
@@ -67,52 +68,47 @@ export default function PixelGame() {
     sceneRef.current?.setWeather(state.weather.condition)
   }, [state.weather.condition])
 
+  const node = getCurrentNode()
+
   return (
-    <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
-      <div ref={containerRef} className="w-full h-full rounded-lg overflow-hidden border border-mountain-700/60" />
+    <div className="relative w-full overflow-hidden rounded-lg border border-mountain-700/60" style={{ aspectRatio: '3/2' }}>
+      <div ref={containerRef} className="w-full h-full" style={{ imageRendering: 'pixelated' }} />
 
-      {/* HUD overlay */}
-      <div className="absolute top-2 left-2 bg-mountain-900/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-mountain-700/50">
-        <div className="text-sm font-mono text-ice-400 font-bold">{getCurrentNode().name}</div>
-        <div className="text-xs font-mono text-mountain-400">{getCurrentNode().altitude}m · {getCurrentNode().terrainType}</div>
+      {/* HUD */}
+      <div className="absolute top-2 left-2 bg-mountain-900/85 backdrop-blur-sm rounded px-2.5 py-1.5 border border-mountain-700/50">
+        <div className="text-sm font-bold text-ice-400">{node.name}</div>
+        <div className="text-xs text-mountain-400">{node.altitude}m · {node.terrainType}</div>
       </div>
 
-      <div className="absolute top-2 right-2 bg-mountain-900/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-mountain-700/50">
-        <div className="text-xs font-mono text-mountain-300">
-          {state.weather.condition} {state.weather.temperature}°C
-        </div>
-        <div className="text-xs font-mono text-mountain-500">第{state.dayCount}天 {String(state.hourCount).padStart(2,'0')}:00</div>
+      <div className="absolute top-2 right-2 bg-mountain-900/85 backdrop-blur-sm rounded px-2.5 py-1.5 border border-mountain-700/50">
+        <div className="text-xs text-mountain-300">{state.weather.condition} {state.weather.temperature}°C</div>
+        <div className="text-xs text-mountain-500">第{state.dayCount}天 {String(state.hourCount).padStart(2, '0')}:00</div>
       </div>
 
-      {/* Status bars */}
-      <div className="absolute bottom-2 left-2 right-2 flex gap-2">
-        <Bar label="❤️" value={state.health} color="#ef4444" />
-        <Bar label="⚡" value={state.stamina} color="#22c55e" />
-        <Bar label="💧" value={state.hydration} color="#38bdf8" />
-        <Bar label="🍖" value={state.hunger} color="#f59e0b" />
+      {/* Bottom status */}
+      <div className="absolute bottom-2 left-2 right-2 flex gap-1.5">
+        <Bar icon="❤️" value={state.health} color="#ef4444" />
+        <Bar icon="⚡" value={state.stamina} color="#22c55e" />
+        <Bar icon="💧" value={state.hydration} color="#38bdf8" />
+        <Bar icon="🍖" value={state.hunger} color="#f59e0b" />
       </div>
 
       {/* Controls hint */}
-      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-mountain-900/70 rounded px-2 py-0.5 text-xs font-mono text-mountain-500">
-        WASD / 方向键移动 · E 互动
+      <div className="absolute bottom-14 left-1/2 -translate-x-1/2 text-xs text-mountain-600 pointer-events-none">
+        WASD移动 · E互动
       </div>
-
-      {/* Scanlines */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 2px, rgba(0,0,0,0.4) 4px)' }}
-      />
     </div>
   )
 }
 
-function Bar({ label, value, color }: { label: string; value: number; color: string }) {
+function Bar({ icon, value, color }: { icon: string; value: number; color: string }) {
   return (
-    <div className="flex-1 bg-mountain-900/80 rounded px-1.5 py-0.5 border border-mountain-700/40 flex items-center gap-1">
-      <span className="text-xs">{label}</span>
-      <div className="flex-1 h-2 bg-mountain-700 rounded-full overflow-hidden">
+    <div className="flex-1 bg-mountain-900/80 rounded px-1 py-0.5 flex items-center gap-1">
+      <span className="text-xs">{icon}</span>
+      <div className="flex-1 h-1.5 bg-mountain-700 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${value}%`, backgroundColor: color }} />
       </div>
-      <span className="text-xs font-mono text-mountain-400 w-6 text-right">{value}</span>
+      <span className="text-xs font-mono text-mountain-400 w-5 text-right">{value}</span>
     </div>
   )
 }
