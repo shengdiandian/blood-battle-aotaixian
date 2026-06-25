@@ -4,6 +4,9 @@ import { gameState, getCurrentNode, moveToNode, makeCamp, eatAndDrink, useFirstA
 import { Mountain, Tent, UtensilsCrossed, Heart, ArrowRight, RotateCcw, AlertTriangle, Flame, SkipForward, Compass, Sunrise, Moon, Wind, CloudRain, Snowflake } from 'lucide-react'
 import type { RouteNode } from '../types'
 import endingsData from '../data/endings.json'
+import TerrainScene from './TerrainScene'
+import HikerCharacter from './HikerCharacter'
+import AnimatedEventCard from './AnimatedEventCard'
 
 function getNodeById(id: string): RouteNode | undefined {
   return getRouteNodes().find(n => n.id === id)
@@ -64,10 +67,24 @@ export default function GamePanel() {
 
   return (
     <div className="bg-mountain-800/80 backdrop-blur rounded-lg border border-mountain-700/60 h-full flex flex-col card-atmosphere">
+      {/* Terrain scene illustration */}
+      <div className="p-3 pb-0">
+        <TerrainScene terrainType={currentNode.terrainType} weather={state.weather.condition} />
+      </div>
+
       {/* Scene header with atmosphere */}
-      <div className="p-5 border-b border-mountain-700/50 relative">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
+      <div className="p-4 sm:p-5 pb-3 border-b border-mountain-700/50 relative">
+        <div className="flex items-start gap-3">
+          {/* Hiker character */}
+          <div className="hidden sm:block shrink-0">
+            <HikerCharacter
+              health={state.health}
+              stamina={state.stamina}
+              hydration={state.hydration}
+              weather={state.weather.condition}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">{terrainIcons[currentNode.terrainType] || '⛰️'}</span>
               <h2 className="text-lg font-bold text-mountain-100 tracking-wide">
@@ -89,13 +106,13 @@ export default function GamePanel() {
               <span>预计 {currentNode.baseTimeCost}h</span>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <div className={`flex items-center gap-1.5 text-xs ${weatherInfo.color}`}>
               <WeatherIcon size={14} />
               <span>{state.weather.condition}</span>
               <span className="text-mountain-300">{state.weather.temperature}°C</span>
             </div>
-            <p className="text-xs text-mountain-500 mt-0.5">{weatherInfo.tip}</p>
+            <p className="text-xs text-mountain-500 mt-0.5 hidden sm:block">{weatherInfo.tip}</p>
           </div>
         </div>
       </div>
@@ -214,93 +231,13 @@ function EventScreen() {
 
   if (!event) return null
 
-  const categoryConfig: Record<string, { icon: typeof AlertTriangle; color: string; bg: string; border: string; label: string }> = {
-    terrain: { icon: Mountain, color: 'text-orange-400', bg: 'bg-orange-500/8', border: 'border-orange-500/30', label: '地形事件' },
-    weather: { icon: AlertTriangle, color: 'text-blue-400', bg: 'bg-blue-500/8', border: 'border-blue-500/30', label: '天气事件' },
-    encounter: { icon: Flame, color: 'text-green-400', bg: 'bg-green-500/8', border: 'border-green-500/30', label: '遭遇事件' },
-    discovery: { icon: Flame, color: 'text-yellow-400', bg: 'bg-yellow-500/8', border: 'border-yellow-500/30', label: '发现事件' },
-    crisis: { icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/8', border: 'border-red-500/30', label: '危机事件' },
-    memorial: { icon: Flame, color: 'text-purple-400', bg: 'bg-purple-500/8', border: 'border-purple-500/30', label: '纪念事件' },
-  }
-
-  const config = categoryConfig[event.category] || categoryConfig.terrain
-  const Icon = config.icon
-  const isMemorial = event.category === 'memorial'
-
   return (
-    <div className={`bg-mountain-800/80 backdrop-blur rounded-lg border h-full flex flex-col card-atmosphere ${
-      isMemorial ? 'border-purple-500/30 memorial-card' : 'border-mountain-700/60'
-    }`}>
-      {/* Event header */}
-      <div className={`p-5 border-b ${isMemorial ? 'border-purple-500/20' : config.border}`}>
-        <div className="flex items-center gap-2">
-          <Icon size={18} className={config.color} />
-          <h2 className={`text-lg font-bold ${config.color}`}>{event.title}</h2>
-          <span className={`text-xs px-2 py-0.5 rounded-full border ${config.border} ${config.color} bg-current/5`}>
-            {config.label}
-          </span>
-          {isMemorial && (
-            <span className="text-xs bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded">真实事故纪念</span>
-          )}
-        </div>
-        <p className="mt-3 text-sm text-mountain-200 leading-relaxed story-text">
-          {event.description}
-        </p>
-      </div>
-
-      {/* Choice list */}
-      <div className="flex-1 p-5 overflow-y-auto">
-        <h3 className="text-xs font-bold text-mountain-400 mb-3 tracking-wider uppercase">做出你的选择</h3>
-        <div className="space-y-3">
-          {event.choices.map((choice, idx) => (
-            <button
-              key={choice.id}
-              onClick={() => handleEventChoice(choice.id)}
-              className={`choice-btn w-full text-left p-4 rounded-lg border transition-all duration-250 cursor-pointer
-                ${config.bg} ${config.border} hover:brightness-150 hover:scale-[1.01]`}
-            >
-              <div className="flex items-start gap-3">
-                <span className={`text-lg font-bold ${config.color} opacity-40`}>{idx + 1}</span>
-                <div className="flex-1">
-                  <p className={`font-medium text-sm ${config.color}`}>{choice.text}</p>
-                  <p className="text-xs text-mountain-400 mt-1 leading-relaxed">{choice.narrative}</p>
-                </div>
-                <ArrowRight size={16} className={`${config.color} mt-0.5 shrink-0 opacity-40`} />
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {isMemorial && (
-          <button
-            onClick={skipEvent}
-            className="mt-4 flex items-center gap-1.5 px-3 py-1.5 bg-mountain-700/60 hover:bg-mountain-600/80
-              border border-mountain-600/50 rounded-md text-xs text-mountain-400 transition-all cursor-pointer"
-          >
-            <SkipForward size={12} /> 默默走过
-          </button>
-        )}
-      </div>
-
-      {/* Recent log */}
-      {state.log.length > 0 && (
-        <div className="p-3 border-t border-mountain-700/40 max-h-24 overflow-y-auto">
-          {state.log.slice(-3).map(entry => (
-            <div
-              key={entry.id}
-              className={`text-xs py-0.5 px-2 ${
-                entry.type === 'danger' ? 'text-danger-400' :
-                entry.type === 'warning' ? 'text-warning-400' :
-                entry.type === 'success' ? 'text-success-400' :
-                entry.type === 'memorial' ? 'text-purple-400' :
-                'text-mountain-400'
-              }`}
-            >
-              {entry.message}
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="h-full">
+      <AnimatedEventCard
+        event={event}
+        onChoice={handleEventChoice}
+        onSkip={event.category === 'memorial' ? skipEvent : undefined}
+      />
     </div>
   )
 }
@@ -317,7 +254,14 @@ function StartScreen() {
   }, [])
 
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div className="h-full flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden">
+      {/* Mountain background scenes */}
+      <div className="absolute inset-x-0 bottom-0 h-40 sm:h-56 pointer-events-none opacity-60">
+        <TerrainScene terrainType="刃脊" weather="晴" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-28 sm:h-40 pointer-events-none opacity-40 translate-y-8">
+        <TerrainScene terrainType="石海" weather="晴" />
+      </div>
       {/* Mountain silhouette background */}
       <div className="absolute inset-0 flex items-end justify-center pointer-events-none opacity-10">
         <svg viewBox="0 0 1200 400" className="w-full" preserveAspectRatio="none">
